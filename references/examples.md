@@ -1,7 +1,7 @@
 # 4b. Examples and the patterns they teach
 
 All of these live in the `g-buddy` repo under `examples/`, numbered for reading
-order. 02–05 are GUI scripts (`while True`), meant to be deployed and run in the
+order. 02–04 are GUI scripts (`while True`), meant to be deployed and run in the
 background (`paramiko.md`).
 
 | File | What it is | Teaches |
@@ -9,8 +9,7 @@ background (`paramiko.md`).
 | `01_hello_world.py` | 14-line smoke test: centred "Hello Buddy!" | Minimal shape of every GUI script |
 | `02_animated_eyes_portrait.py` | Animated buddy face, **portrait 240×320** | Shape animation, mood table, touch-follow, idle behaviour |
 | `03_animated_eyes_landscape.py` | Same face, **landscape 320×240** | Landscape layout + mood label; requires Xorg rotate |
-| `04_voice_input_demo.py` | Mic level meter + face that reacts to voice | `sound_level()`/`sound_dBFS()`, thresholds, push-to-talk recording, WAV playback |
-| `05_push_to_talk_stt.py` | Push-to-talk Vosk STT in one circle | Record-then-decode, thread + queue UI, Vosk ABI preload, `--file` test mode |
+| `04_push_to_talk_stt.py` | Push-to-talk Vosk STT in one circle | Record-then-decode, thread + queue UI, Vosk ABI preload, `--file` test mode |
 
 ## 01 — hello world
 
@@ -45,17 +44,7 @@ eased iris movement, and a sin-eased blink.
 Reusable: everything is a `widget.config(...)` update per frame at ~30 FPS
 (`time.sleep(1/30)`), never a redraw.
 
-## 04 — voice input demo
-
-- `audio.sound_level()` → 0–100 % bar; `audio.sound_dBFS()` → raw readout.
-- Thresholds: `LOUD ≥ 30 %` → surprised, `ENGAGED ≥ 10 %` → happy,
-  `SLEEPY_IDLE = 15 s` of quiet → sleepy. Speech overrides the button mood.
-- **Push-to-talk**: `button_b` press starts `audio.start_record(path)`, release
-  stops and auto-plays; clips go to `/tmp/voice_clips/voice_<timestamp>.wav`.
-  Buzzer ticks (880 Hz start / 440 Hz stop) — note the `buzzer.pitch` int-beat
-  rule in `m10-api.md`.
-
-## 05 — push-to-talk STT (the most complete reference)
+## 04 — push-to-talk STT (the most complete reference)
 
 One circle is the whole UI: **green** idle → **yellow** while B is held and the
 mic records → **red** while Vosk decodes → **green** with the transcript.
@@ -64,7 +53,7 @@ Architecture worth copying:
 
 - **Record to a file, then decode it.** The button press *is* the utterance
   boundary, so no voice-activity detection is needed. Clips are kept in
-  `/tmp/05-voice/voice_<timestamp>.wav` (16 kHz mono 16-bit).
+  `/tmp/04-voice/voice_<timestamp>.wav` (16 kHz mono 16-bit).
 - **One mic thread owns the pyaudio stream** and reads continuously (so pressing
   B has no open-gap); it appends frames only while recording.
 - **Decode runs in a short-lived thread** so the mic keeps draining while Vosk
@@ -133,10 +122,10 @@ def wrap_text(text, width=20):
 ## Running them
 
 ```python
-c.open_sftp().put("examples/05_push_to_talk_stt.py",
-                  "/root/g-buddy/05_push_to_talk_stt.py")
-run("pkill -KILL -f '05_push_to_talk_stt'; sleep 1", 5)
-run("cd /root/g-buddy && (python3 05_push_to_talk_stt.py > /tmp/t05.out 2> /tmp/t05.err &)", 5)
+c.open_sftp().put("examples/04_push_to_talk_stt.py",
+                  "/root/g-buddy/04_push_to_talk_stt.py")
+run("pkill -KILL -f '04_push_to_talk_stt'; sleep 1", 5)
+run("cd /root/g-buddy && (python3 04_push_to_talk_stt.py > /tmp/t04.out 2> /tmp/t04.err &)", 5)
 ```
 
 Expect a confirmed green idle circle on the panel before trusting anything else.

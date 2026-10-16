@@ -241,6 +241,11 @@ alternative (fbtft `rotate=90` modprobe option + reboot) exists but needs
 patching `unihiker.GUI`'s hardcoded 240×320; the `/sys/class/graphics/fb0/rotate`
 sysfs is **read-only** here.
 
+> **A firmware flash wipes this file** — the board returns to portrait 240×320.
+> Re-apply it (and re-calibrate touch) after every flash → `flash-firmware.md`.
+> Symptom of forgetting: landscape GUIs render with their content **clipped on
+> the right** (`verify-gui.md`).
+
 **Screenshot orientation:** the framebuffer is still 240×320, so rotate the
 fetched image on the PC with `img.rotate(90, expand=True)` to match what the user
 sees.

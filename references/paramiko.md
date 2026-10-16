@@ -35,8 +35,8 @@ and ALSA errors to stderr, and you usually want both to judge "did it start".
 
 ```python
 c = client()
-c.open_sftp().put("examples/05_push_to_talk_stt.py",
-                  "/root/g-buddy/05_push_to_talk_stt.py")
+c.open_sftp().put("examples/04_push_to_talk_stt.py",
+                  "/root/g-buddy/04_push_to_talk_stt.py")
 c.close()
 ```
 

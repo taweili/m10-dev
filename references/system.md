@@ -3,7 +3,7 @@
 The M10 is a **throwaway-appliance** Debian box: everything outside `/root/` and
 `/usr/local/lib/python3.7/dist-packages/` is DFRobot's image, and the *only* way
 to move the kernel, coprocessor firmware or DFRobot's own libraries forward is a
-**reflash**.
+**reflash** — see `flash-firmware.md`.
 
 ## What's on the box (as-shipped, v0.4.0)
 
@@ -32,7 +32,7 @@ so a plain `apt-get update` returns **404** for every repo.
 
 Images: `https://download3.dfrobot.com.cn/unihiker/img/`. Burners: Batch Tool
 (GUI, **Windows only**, up to 10 boards), or `rkdeveloptool` (CLI, all
-platforms, Rockchip's tool).
+platforms, Rockchip's tool — see `flash-firmware.md`).
 
 ## `apt` is broken — the fix
 
@@ -148,23 +148,18 @@ There's a helper in the repo: `scripts/m10-disable-bloat.py`.
 
 ## Reflash (the only real upgrade path)
 
-1. **Back up `/root/` off the board** — SFTP or `scp`, *not* the Samba share
-   (Samba silently skips dotfiles like `.ssh`, `.config`).
-2. Download the image, extract `.7z` → `.img`. **Do not rename it** — the
-   trailing 32-hex in the filename is the MD5 and the burner verifies it.
-3. Get a burner (Batch Tool or `rkdeveloptool`).
-4. Enter flash mode: unplug USB → **hold Home** → plug USB in. Screen goes
-   **white**; the board enumerates as a Rockusb device. Release Home once the
-   burner has claimed it.
-5. Burn (~5 min), then Batch Tool installs (board reboots twice, ~1 min).
-6. On boot: pick language (A/B + Home), then **long-press Home → Calibrate touch
-   screen** (required after *every* flash).
-7. Re-join Wi-Fi — `/etc/NetworkManager/system-connections/` was wiped.
-8. Let `firstRun.sh` run once (burns the coprocessor firmware). Don't skip it.
+**Full procedure: `flash-firmware.md`.** Read it before starting — the ordering
+matters.
 
-A flash empties `/root/` (all your files and pip installs), replaces
-`/opt/unihiker/*`, regenerates SSH host keys, and rebuilds site-packages under
-the new Python version's directory.
+A flash is a **reimage, not an upgrade**. It empties `/root/` (files, pip
+installs, Vosk models), wipes the Wi-Fi profiles, drops the landscape `Rotate`
+config (the board returns portrait 240×320), replaces `/opt/unihiker/*`,
+regenerates SSH host keys, and rebuilds site-packages under the new Python
+version's directory.
+
+So: **back up first** (SFTP/`scp`, *not* Samba — it skips dotfiles), then
+`flash-firmware.md` for the burner kit, maskrom entry, `rkdeveloptool` commands
+and the post-flash checklist.
 
 ## Quick status checks
 

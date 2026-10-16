@@ -1,6 +1,6 @@
 ---
 name: m10-dev
-description: Develop and deploy Python for the DFRobot UNIHIKER M10 (RK3308 Linux SBC). Use when working with an M10 over its USB-C link — reaching it at 10.1.2.3, repairing a broken USB link, joining Wi-Fi, SSH/SFTP via paramiko, deploying and running scripts, capturing framebuffer screenshots, or using the on-board hardware: unihiker GUI/Audio, pinpong GPIO/sensors/buttons/buzzer/LED, the onboard microphone, landscape rotation, Debian package/service maintenance, and offline or cloud speech-to-text and text-to-speech. Triggers: UNIHIKER, M10, K10, pinpong, unihiker, dfrobot, 10.1.2.3, "the board", board deploy, M10 mic/buzzer/buttons/screen, Vosk, Azure Speech.
+description: "Develop and deploy Python for the DFRobot UNIHIKER M10 (RK3308 Linux SBC). Use when working with an M10 over its USB-C link — reaching it at 10.1.2.3, repairing a broken USB link, joining Wi-Fi, SSH/SFTP via paramiko, deploying and running scripts, capturing framebuffer screenshots, or using the on-board hardware: unihiker GUI/Audio, pinpong GPIO/sensors/buttons/buzzer/LED, the onboard microphone, landscape rotation, Debian package/service maintenance, and offline or cloud speech-to-text and text-to-speech. Also covers reflashing the firmware from Linux with rkdeveloptool (maskrom mode, burner kit, post-flash reconfiguration). Triggers: UNIHIKER, M10, K10, pinpong, unihiker, dfrobot, 10.1.2.3, \"the board\", board deploy, M10 mic/buzzer/buttons/screen, Vosk, Azure Speech, firmware update, reflash, flash firmware, rkdeveloptool, maskrom, v0.4.2, burner."
 ---
 
 # M10 dev
@@ -23,7 +23,7 @@ is on the board until you push it.
 | Audio out | **no onboard speaker** — needs a USB speaker in the USB-A port |
 | GPIO library | `pinpong` 0.6.1 (coprocessor is a GD32VF103 RISC-V) |
 | Transport | **paramiko only** — no `sshpass`/`expect` on the PC |
-| Firmware | v0.4.0 snapshot from ~Feb 2023; Debian 10 is **EOL** → `apt` is broken out of the box |
+| Firmware | **v0.4.2** (ships as v0.4.0); Debian 10 is **EOL** → `apt` needs `archive.debian.org` |
 
 ## Reference map
 
@@ -36,10 +36,11 @@ Read the reference that matches the task; each is self-contained.
 | Dev environment: paramiko, deploy, run, stop, screenshots | `references/paramiko.md` |
 | Use M10 functions: GUI, buttons, sensors, buzzer, audio, mic, framebuffer, landscape | `references/m10-api.md` |
 | Runnable examples and the code patterns they teach | `references/examples.md` |
-| OS, packages, `apt`/EOL fix, services to disable, reflash | `references/system.md` |
+| OS, packages, `apt`/EOL fix, firmware ladder, services to disable | `references/system.md` |
 | Speech in and out: STT/TTS options, models, pipelines | `references/speech.md` |
 | Azure Speech (real-time STT + neural TTS) | `references/azure-speech.md` |
 | Prove a GUI rendered, from `/dev/fb0` | `references/verify-gui.md` |
+| **Flash/reflash firmware** from Linux with `rkdeveloptool` — destructive, read first | `references/flash-firmware.md` |
 
 ## Non-negotiables
 
@@ -61,6 +62,10 @@ Read the reference that matches the task; each is self-contained.
    `references/verify-gui.md`.
 8. **Vosk (and only Vosk) needs the Debian 11 `libstdc++` preload** →
    `references/speech.md`.
+9. **A flash is a reimage, not an upgrade.** It wipes `/root/`, the Wi-Fi
+   profiles, and the landscape `Rotate` config (the board returns portrait
+   240×320), so back up — and re-apply landscape — every time →
+   `references/flash-firmware.md`.
 
 ## Quick start
 
