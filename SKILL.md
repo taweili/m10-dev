@@ -22,7 +22,7 @@ is on the board until you push it.
 | Hardware | Home/A/B buttons, **onboard mic**, passive buzzer, blue LED (`P25`), light sensor, 6-axis IMU |
 | Audio out | **no onboard speaker** — needs a USB speaker in the USB-A port |
 | GPIO library | `pinpong` 0.6.1 (coprocessor is a GD32VF103 RISC-V) |
-| Transport | **paramiko only** — no `sshpass`/`expect` on the PC |
+| Transport | **paramiko** (pure Python) — no `sshpass`/`expect` needed |
 | Firmware | **v0.4.2** (ships as v0.4.0); Debian 10 is **EOL** → `apt` needs `archive.debian.org` |
 
 ## Reference map
@@ -35,7 +35,7 @@ Read the reference that matches the task; each is self-contained.
 | Put the board on Wi-Fi | `references/wifi.md` |
 | Dev environment: paramiko, deploy, run, stop, screenshots | `references/paramiko.md` |
 | Use M10 functions: GUI, buttons, sensors, buzzer, audio, mic, framebuffer, landscape | `references/m10-api.md` |
-| Runnable examples and the code patterns they teach | `references/examples.md` |
+| Draw and animate: full GUI API, `config()` options, emoji sprites, easing | `references/gui-drawing.md` |
 | OS, packages, `apt`/EOL fix, firmware ladder, services to disable | `references/system.md` |
 | Speech in and out: STT/TTS options, models, pipelines | `references/speech.md` |
 | Azure Speech (real-time STT + neural TTS) | `references/azure-speech.md` |
@@ -54,18 +54,25 @@ Read the reference that matches the task; each is self-contained.
 4. **`buzzer.pitch(freq, beat)` takes an integer beat count, not milliseconds,
    and blocks** while it sounds. Use `buzzer.pitch(freq)` for a non-blocking
    tone → `references/m10-api.md`.
-5. **`apt` is broken on this image** (Debian 10 EOL, 404s). Repoint to
+5. **`fill_rect` has no radius.** Use `fill_round_rect(...)`, which does take
+   `r=`, for anything round; `fill_circle` takes its x,y as the **centre** →
+   `references/gui-drawing.md`.
+6. **`apt` is broken on this image** (Debian 10 EOL, 404s). Repoint to
    `archive.debian.org` before installing anything → `references/system.md`.
-6. **No onboard speaker, but there *is* an onboard mic.** Skip ALSA devices
+7. **No onboard speaker, but there *is* an onboard mic.** Skip ALSA devices
    named `Loopback` → `references/m10-api.md`.
-7. **PIL 9.0.1 here cannot decode RGB565.** Decode `/dev/fb0` by hand →
+8. **PIL 9.0.1 here cannot decode RGB565.** Decode `/dev/fb0` by hand →
    `references/verify-gui.md`.
-8. **Vosk (and only Vosk) needs the Debian 11 `libstdc++` preload** →
+9. **Vosk (and only Vosk) needs the Debian 11 `libstdc++` preload** →
    `references/speech.md`.
-9. **A flash is a reimage, not an upgrade.** It wipes `/root/`, the Wi-Fi
-   profiles, and the landscape `Rotate` config (the board returns portrait
-   240×320), so back up — and re-apply landscape — every time →
-   `references/flash-firmware.md`.
+10. **A flash is a reimage, not an upgrade.** It wipes `/root/`, the Wi-Fi
+    profiles, and the landscape `Rotate` config (the board returns portrait
+    240×320), so back up — and re-apply landscape — every time →
+    `references/flash-firmware.md`.
+11. **Touch arrives as raw, uncalibrated 12-bit ADC.** There is no
+    `/etc/pointercal` on the image, so the X/tslib path is dead until you fit
+    one; evdev + your own affine works out of the box →
+    `references/m10-api.md` §9.
 
 ## Quick start
 
@@ -89,7 +96,8 @@ start with `references/board-link.md`.
 
 ## Related material
 
-A reference implementation of all of this lives in the `g-buddy` repo
-(`AGENT.md`, `examples/`, `notes/`, `scripts/m10-network-setup.sh`). This skill
-is self-contained and distils those notes; the repo remains the source of the
-worked examples and the raw research logs.
+`SKILL.md` and `references/` are the canonical how-to. The `g-buddy` repo
+(`AGENTS.md`, `examples/README.md`, `scripts/`) is the reference implementation:
+runnable demos, the USB-link repair script, and host-specific deploy helpers.
+Read the skill first — the repo is where the board-specific instance lives, not
+a parallel copy of this material.

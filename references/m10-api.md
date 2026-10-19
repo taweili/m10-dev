@@ -34,24 +34,32 @@ gui = GUI()                    # or GUI(w=320, h=240) in landscape
 | `draw_image(x, y, w, h, image, origin, onclick)` | PNG/JPG **filename or PIL `Image`** |
 | `draw_digit`, `draw_emoji`, `draw_clock / fill_clock`, `draw_qr_code` | extras |
 | `add_button(text, x, y, w, h, onclick, state)` | touch button |
+| `add_text_box / add_list_box` | scrollable entry / list (undocumented in the wiki) |
 | `on_mouse_move(handler)` | touch/drag → `handler(x, y)` |
-| `on_key_click(onclick=fn)` | USB keyboard (**keyword arg only**) |
+| `on_key_click(event, onclick)` | USB keyboard — **two positional args** |
 | `GUI.clear()`, `w.remove()`, `GUI.remove(w)` | destroy |
 
 **Mutate, don't recreate:** `w.config(text=…, x=…, y=…, r=…, color=…)`. Redrawing
-in a loop flickers.
+in a loop flickers. `.remove()` is final — hide by moving off-screen
+(`x=-9999, y=-9999`), not by removing.
 
-**Anchors:** every widget accepts `origin=` — `center`, `top`, `bottom`, `left`,
-`right`, `nw|ne|sw|se`, or `n|s|w|e`.
+**Anchors:** `origin=` exists on **text, image, emoji, QR, button, text box and
+list box only** — the shape primitives ignore it. Values: `center`, `top`,
+`bottom`, `left`, `right`, `nw|ne|sw|se`, `n|s|w|e`.
 
 **Colours:** `#RRGGBB`, `(r,g,b)`, or Tk names (`"red"`).
 
 **The two hard-won quirks:**
 
-1. **`fill_rect` has no radius.** `fill_rect(..., r=X)` is silently ignored at
+1. **`fill_rect` / `draw_rect` have no radius.** `r=` is silently ignored at
    creation; `w.config(r=X)` raises `_tkinter.TclError: unknown option "-r"`.
-   For anything round use **`fill_circle`** (which does accept `r=`).
-2. **`fill_circle`'s `x, y` are the centre**, not a corner.
+   Use **`fill_round_rect` / `draw_round_rect`** for rounded corners — they do
+   take `r=` (clamped to half the short side).
+2. **`fill_circle`'s `x, y` are the centre**, not a corner (rects use top-left).
+
+> The full, source-verified API — every primitive, per-widget `.config()`
+> options, `draw_emoji` as a real sprite animator, widget state, threading helpers,
+> fonts/brightness and the animation patterns — is in **`gui-drawing.md`**.
 
 **Image files must sit in the same directory as the running `.py`.** A PIL
 `Image` also works for `image=` (good for camera frames).
@@ -76,7 +84,17 @@ button_a.irq(trigger=Pin.IRQ_RISING, handler=lambda pin: ...)
 ```
 
 Edge detection with a previous-state variable is the standard way to get
-press/release semantics (push-to-talk, toggles) out of a polling loop.
+press/release semantics (push-to-talk, toggles) out of a polling loop. The
+full press/release shape, including the state guard:
+
+```python
+b = button_b.is_pressed()
+if b and not prev_b and state in ("idle", "result"):   # rising edge → start
+    start()
+elif not b and prev_b and state == "recording":        # falling edge → stop
+    stop()
+prev_b = b
+```
 
 `gui.on_key_click` is for a **USB keyboard**, not the on-board A button.
 
@@ -267,18 +285,139 @@ Everything else — option and decision tables, the exact ABI-fix commands, the
 canonical decode loop, the model download/deploy recipe, pipeline strategies and
 Azure integration — is in **`speech.md`** and **`azure-speech.md`**.
 
-## 9. Gotcha summary
+## 9. Touch & pointer input
+
+The panel is a **4-wire resistive** digitizer driven by an **NS2009** on I2C2
+(`0x48`); the kernel exposes it as `/dev/input/eventN` with **raw 12-bit ADC
+counts**:
+
+```
+ABS_X 0..4095   ABS_Y 0..4095   BTN_TOUCH 0/1
+```
+
+**Nothing maps those counts to pixels by default.** The image ships tslib
+(`/etc/ts.conf` + `TSLIB_CALIBFILE=/etc/pointercal`) and an X InputClass bound
+to the tslib driver, but **no `/etc/pointercal`** and no `TSLIB_*` in X's
+environment — so the X-level touch path is unusable until someone calibrates.
+
+Three ways touch reaches Python:
+
+| Path | API | Notes |
+|---|---|---|
+| **evdev** (works out of the box) | `/dev/input/eventN` → raw counts, map yourself | no X/tslib dependency; do not grab the device, X keeps working too |
+| X + tslib | calibrated pointer coords, after `ts_calibrate` | needs `/etc/pointercal`; restart X apps after writing it |
+| `unihiker` GUI | `on_mouse_move(fn)`, `add_button(onclick=)`, `draw_*(onclick=)` | no generic canvas press/release → bind `gui.canvas` for tap/drag/release |
+
+**Hardware facts that shape the code:** single touch, no pressure axis
+(`BTN_TOUCH` is a contact bit), no hover, driver polls at ~30 ms (~33 samples/s,
+so fast strokes quantise), and it wants a firm press (fingernail/stylus).
+In landscape, X has already rotated the coordinates — Tk coordinates are panel
+coordinates; the framebuffer is still 240×320 (`verify-gui.md`).
+
+**Calibration is an affine fit, not a swap.** Axis order/inversion are panel
+wiring properties — do not hardcode them. Fit six coefficients by least squares
+from ≥3 (5 is better) raw↔pixel pairs:
+
+```python
+# panel_x = a*rx + b*ry + c ;  panel_y = d*rx + e*ry + f
+
+# pointercal is 7 integers: the six coefficients in fixed point (scale 65536),
+# then the scale itself — tslib's "linear" module format.
+open("/etc/pointercal", "w").write(
+    " ".join(str(int(round(v * 65536))) for v in coef) + " 65536\n")
+```
+
+Locate the device by capability (`ABS_X`+`ABS_Y`+`BTN_TOUCH`, or name
+`ns2009_ts`), never by hardcoded event number. A fabricated full-range
+guess-calibration is usually wrong in offset and sometimes in axis order — fine
+as a fallback, not as the answer.
+
+**Gestures are yours to derive** on release, from duration + travel +
+displacement: tap (`<0.35 s`, `<14 px`), long press (`≥0.6 s`, small travel),
+drag, swipe (≥24 px travel, dominant axis). Use the **release** position, not
+the press position, or every swipe measures 0 px.
+
+Worked implementation (evdev reader thread, in-process calibration, 5-point
+tslib-compatible `--calibrate`, hand-rolled canvas buttons, gesture recogniser):
+`examples/05_touch_playground.py` in the `g-buddy` repo (notes in its
+`examples/README.md`). The `unihiker` widgets cover taps only —
+`add_button(onclick=)` and `draw_*(onclick=)` are `<Button-1>` bindings on one
+item, and `on_mouse_move` gives you motion without contact state.
+
+## 10. Expansion ports, camera and comms
+
+Pin names follow the micro:bit-compatible edge connector (`P0`…`P28` style).
+
+```python
+d  = Pin(Pin.P20, Pin.IN);   d.value()          # digital in
+led = Pin(Pin.P25, Pin.OUT); led.write_digital(1)
+pwm = Pin(Pin.P21, Pin.PWM); pwm.write_analog(200)   # 0..255
+adc = Pin(Pin.P12, Pin.ADC); adc.value()
+s  = Servo(Pin(Pin.P21));   s.angle(90)             # 0..180
+```
+
+Servo-capable pins: `P0 P2 P3 P8 P9 P10 P16 P21 P22 P23`. `pinpong.libs.*`
+supplies the modules the wiki uses: `RGB_LEDStrip`, `DHT11`, `Ultrasonic`,
+`OLED2864`, `ColorRecognition`, `Uart`, `I2c`, `Spi`.
+
+**Camera** — the M10 has no on-board camera; a USB camera works and feeds the
+GUI directly (note the rotation: the panel is portrait, the camera is not):
+
+```python
+import cv2
+from PIL import Image
+
+cap = cv2.VideoCapture(0)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 240); cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 320)
+cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+bg = gui.draw_image(image="", x=0, y=0)          # create the item once
+while True:
+    ok, frame = cap.read()
+    if ok:
+        frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+        bg.config(image=Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)))
+```
+
+**Bluetooth** — the on-board RTL8723DS does Classic RFCOMM (`bluetooth`
+module, enable with `hciconfig hci0 piscan`, server `BluetoothSocket(RFCOMM)`
+on port 1, client `connect(("MAC", 1))`). **BLE is not the same thing** and the
+stock API set does not cover it properly; the wiki's BLE examples use the
+DFRobot BLELink accessory. Linux BlueZ (`bleak`, `bluepy`) is the honest path.
+
+**UART / I²C / SPI** — plain Debian devices plus `pinpong.libs.{Uart,I2c,Spi}`;
+overlays are already in `/boot/uEnv.txt` (`uart0`, `i2c1`, `i2c2`, `uart3`,
+`spi-spidev`). `i2c2` is shared with the touch controller and `amic`.
+
+## 11. Gotcha summary
 
 1. `Board().begin()` first, always.
 2. End with `while True: time.sleep(...)`; SIGINT is a clean exit.
-3. `fill_rect` has no radius → use `fill_circle` (x,y = centre).
-4. `on_key_click(onclick=…)` — keyword only, and it's a USB keyboard.
+3. `fill_rect` has no radius → use `fill_round_rect` (or `fill_circle`, whose
+   x,y is the centre).
+4. `on_key_click(event, onclick)` — two positional args, and it's a USB keyboard.
 5. `buzzer.pitch` beat is an int count and blocks.
 6. No onboard speaker; there *is* an onboard mic.
 7. Skip `Loopback` capture devices.
 8. PIL can't decode RGB565 here.
-9. `config()` to update, not recreate (flicker).
+9. `config()` to update, not recreate (flicker); `remove()` is final.
 10. Image files live next to the running script.
 11. `apt` is broken on this image (Debian 10 EOL) until you repoint it to
     `archive.debian.org` → `system.md`.
 12. Cloud speech needs Wi-Fi; on-device models are deployed by SFTP → `speech.md`.
+13. Raw touch is uncalibrated 12-bit ADC — fit the affine yourself → §9.
+14. The rest of the GUI API, and the source-verified corrections to the wiki,
+    are in `gui-drawing.md`.
+
+## Sources
+
+- Wiki home: <https://www.unihiker.com/wiki/>
+- `unihiker` library: <https://www.unihiker.com/wiki/LanguageReference/UNIHIKER_Library/>
+- `pinpong` library: <https://www.unihiker.com/wiki/LanguageReference/PinPong_Library/>
+- Screen coordinates/origins: <https://www.unihiker.com/wiki/LanguageReference/UNIHIKER_Library/GeneralKnowledgeAndFeatures/>
+- Hardware reference: <https://www.unihiker.com/wiki/HardwareReference/hardware_reference_specification/>
+- Python examples index: <https://www.unihiker.com/wiki/Examples/PythonCodingExamples/>
+- GUI source (authoritative): `github.com/UNIHIKER/unihiker-pypi-lib`,
+  `unihiker/src/unihiker/GUI.py`
+
+The wiki's prose is older than the shipped source in several places — where they
+disagree, trust `gui-drawing.md`.

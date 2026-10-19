@@ -55,7 +55,7 @@ one and **verify the MD5**:
 | Windows | `https://dfimg.dfrobot.com/64228321aa9508d63a42c28b/wiki/b4ab152645022f4cf66d4f392e1d5a92.7z` | `24d9ab6b5608b43e39eb130563f5b9d8` |
 
 ```bash
-7z x burner_linux_amd64.7z                 # 7z/7za already on Omarchy
+7z x burner_linux_amd64.7z                 # 7z/7za — usually already installed
 chmod +x burner_linux_amd64/{rkdeveloptool,burner.sh}
 ```
 
@@ -101,17 +101,17 @@ Place it inside the `burner_*` directory, next to `burner.sh`.
 `crw-rw-r--` with no ACL for your user.
 
 - `sudo` wants a password, and a session with no polkit agent cannot prompt.
-- On this machine **`pkexec` works passwordless** — Omarchy ships a polkit rule
-  for `wheel`, and `pkexec id` returns `uid=0(root)`. Note this works *despite*
-  **no polkit agent being installed** (only `polkitd`), so that rule is
-  load-bearing: don't "clean up" the polkit config, or `pkexec` will begin
-  failing with no way to authenticate.
+- `pkexec` is the way in if your host has a passwordless polkit rule for
+  `wheel` (stock Omarchy does). Verify once with `pkexec id` — it must print
+  `uid=0(root)` without prompting. That rule is load-bearing: don't "clean up"
+  the polkit config, or `pkexec` will begin failing with no way to
+  authenticate.
 
 `pkexec` does not inherit `$PATH` and resets the environment, so use **absolute
 paths** throughout:
 
 ```bash
-PK=/home/david/Downloads/m10-burner/burner_linux_amd64/rkdeveloptool
+PK="$PWD/rkdeveloptool"          # inside burner_linux_amd64/
 pkexec $PK ld
 ```
 
@@ -157,7 +157,7 @@ re-enumeration is the `db` success signal.
 as `USB-MSC`" means the reset did not take — go back to `rd`, the loader is still
 running and happy to be re-asked.
 
-`lsusb` is **not installed on Omarchy**, and `dmesg` is blocked
+`lsusb` may be missing (it is on a stock Omarchy), and `dmesg` is often blocked
 (`kernel.dmesg_restrict=1` → *Operation not permitted*). Two ways in:
 
 ```bash

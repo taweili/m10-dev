@@ -111,7 +111,7 @@ print("[%.2f] MODE -> %s" % (time.time(), new_state), file=_s.stderr, flush=True
 
 Board and PC clocks were within ~0.7 s, which is close enough. Also note that
 **state-driven snapshots beat fixed sleeps**: poll the rendered state, and
-capture when it changes (`examples.md` shows the state-machine shape).
+capture when it changes (`gui-drawing.md` §6.7 shows the state-machine shape).
 
 ## Landscape mapping (GUI ↔ framebuffer)
 

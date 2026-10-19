@@ -85,6 +85,49 @@ conda/miniforge — too much disk on a 16 GB eMMC). Caveat: pyenv changes only t
 *python* on PATH; the DFRobot stack (`unihiker`, `pinpong`) lives in
 `/usr/local/lib/python3.7/`, so scripts that import them must run under 3.7.
 
+## Installing packages without Wi-Fi
+
+`pip3 install` needs the internet, and the board is offline until it is on
+Wi-Fi (`wifi.md`). When it cannot be, download on the PC and push an **offline
+bundle**:
+
+```bash
+# on the PC — fetch for arm64 / cp37
+pip3 download --only-binary=:all: --platform manylinux2014_aarch64 \
+  --python-version 37 --implementation cp --abi cp37m -d offline/wheels vosk srt
+```
+
+```python
+# push the tree, then install with NO index access
+push_tree("offline/wheels", "/tmp/offline/wheels")          # recursive sftp.put
+run(c, "pip3 install --no-index --find-links /tmp/offline/wheels --no-deps vosk srt", 180)
+```
+
+`.deb` files are usually wanted **only for one shared library** (the Vosk
+`libstdc++` case, `speech.md`) — extract instead of installing, so nothing in
+the DFRobot image moves:
+
+```bash
+run(c, "dpkg-deb -x /tmp/offline/debs/libstdc++6_10.2.1-6_arm64.deb "
+       "/root/speech-models/extracted_libstdc++")
+run(c, "ls /root/speech-models/extracted_libstdc++/usr/lib/aarch64-linux-gnu/")
+```
+
+Always finish a batch install with an **import check** and the real ABI test,
+because a wheel can install cleanly and still fail to load:
+
+```python
+for mod in ["unihiker", "pinpong", "vosk", "pyaudio", "numpy", "PIL"]:
+    print(mod, run(c, f"python3 -c 'import {mod}; print(getattr({mod}, \"__version__\", \"\"))' 2>&1").strip())
+
+run(c, f"LD_PRELOAD={SO} python3 -c 'import vosk; "
+       f"m=vosk.Model(\"{MODEL}\"); vosk.KaldiRecognizer(m, 16000); "
+       f"print(\"model + recogniser OK\")' 2>&1", 60)
+```
+
+Then `python3 -m py_compile` every deployed script on the board — a syntax
+check after transfer costs ~1 s and catches a truncated SFTP write.
+
 ## Never touch these
 
 | Thing | Why |

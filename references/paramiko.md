@@ -1,8 +1,10 @@
 # 3. Dev environment with paramiko
 
-The PC has **no `sshpass` and no `expect`**. Use **paramiko** for everything:
-SSH exec, SFTP up/down, long-running scripts. Assume code is authored locally
-and pushed to the board; `/root/...` on the board is *not* your working dir.
+Use **paramiko** for everything: SSH exec, SFTP up/down, long-running scripts.
+It is pure Python, so hosts without `sshpass`/`expect` (or where you would
+rather not put a password on a command line) need no extra tooling. Assume code
+is authored locally and pushed to the board; `/root/...` on the board is *not*
+your working dir.
 
 ```bash
 pip install paramiko    # if missing

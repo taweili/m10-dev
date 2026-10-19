@@ -81,8 +81,37 @@ Models: `vosk-model-small-en-us-0.15` (40 MB, ~80 % word accuracy, real-time) vs
 <https://alphacephei.com/vosk/models>.
 
 Decode loop — one recognizer per utterance, join `Result()`s with
-`FinalResult()`; see `m10-api.md` §8 for the canonical snippet and the
-push-to-talk record-then-decode pattern (`examples.md`, example 05).
+`FinalResult()`:
+
+```python
+import json, wave, vosk
+
+SAMPLE_RATE = 16000
+CHUNK = 4000                                  # samples per read = 0.25 s
+model = vosk.Model("/root/speech-models/vosk-model-small-en-us-0.15")  # load ONCE
+
+def transcribe_wav(path):
+    rec = vosk.KaldiRecognizer(model, SAMPLE_RATE)   # fresh per utterance
+    parts = []
+    with wave.open(path, "rb") as wf:
+        while True:
+            data = wf.readframes(CHUNK)
+            if not data:
+                break
+            if rec.AcceptWaveform(data):                  # an utterance final
+                text = json.loads(rec.Result()).get("text", "").strip()
+                if text:
+                    parts.append(text)
+    parts.append(json.loads(rec.FinalResult()).get("text", "").strip())
+    return " ".join(p for p in parts if p).strip()
+```
+
+The **model loads once** (~300 MB, seconds) and recognizers are cheap — never
+re-load the model per clip. For a button-driven UI, record-then-decode beats
+streaming VAD: the press decision *is* the utterance boundary. The worked
+example — mic thread + `queue.Queue` UI hand-off, Vosk self-restart, `--file`
+headless test mode — is `examples/04_push_to_talk_stt.py`, described in the
+repo's `examples/README.md`.
 
 ### Others
 

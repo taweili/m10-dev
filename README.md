@@ -19,8 +19,8 @@ references/
   wifi.md                   # 2  put the board on Wi-Fi (additive; USB link stays up)
   paramiko.md               # 3  SSH/SFTP, deploy, background exec, screenshots
   m10-api.md                # 4a unihiker GUI/audio + pinpong GPIO/sensors/buttons/buzzer
-  examples.md               # 4b runnable examples and the patterns they teach
-  system.md                 # 5  Debian 10 EOL, apt fix, services to disable
+  gui-drawing.md            # 4b full drawing API, emoji sprites, animation + app patterns
+  system.md                 # 5  Debian 10 EOL, apt fix, offline installs, services
   speech.md                 # 6  STT/TTS: Vosk offline, Azure cloud
   azure-speech.md           # 7  Azure Speech real-time STT + neural TTS
   verify-gui.md             # 8  prove a GUI rendered from /dev/fb0 (PIL can't decode RGB565)
@@ -50,15 +50,15 @@ pulls in only what's needed instead of loading ten thousand tokens up front.
 
 ## Host assumptions
 
-The skill assumes an **Omarchy** host for two Omarchy-specific facts that
-otherwise need workarounds:
+Written and tested on an **Omarchy** host (Arch + Hyprland). Two host facts the
+flashing reference depends on, with fallbacks if your host differs:
 
-- `pkexec` works passwordless — Omarchy ships a polkit rule, so
-  `rkdeveloptool` flashing doesn't stall on a TTY password prompt
-  (`references/flash-firmware.md`).
-- `7z` is already installed for unpacking the RK dev pack; `lsusb` is not
-  installed and `dmesg` is locked down — the flashing reference works around
-  both.
+- `pkexec` works passwordless — Omarchy ships a polkit rule for `wheel`, so
+  `rkdeveloptool` flashing doesn't stall on a TTY password prompt. On other
+  hosts, run it as root instead (`references/flash-firmware.md`).
+- `7z` is already installed for unpacking the RK dev pack; `lsusb` may be
+  absent and `dmesg` may be restricted — the flashing reference works around
+  both with `sysfs` and `journalctl -k`.
 
 The board itself is stock DFRobot firmware (v0.4.2), Debian 10, and EOL — so
 `apt` is repointed to `archive.debian.org` before anything is installed
@@ -66,7 +66,8 @@ The board itself is stock DFRobot firmware (v0.4.2), Debian 10, and EOL — so
 
 ## Related
 
-The worked examples this skill distils live in the `g-buddy` repo
-(`AGENT.md`, `examples/`, `notes/`, `scripts/m10-network-setup.sh`). This
-skill is self-contained, but that repo is the source of the raw research logs
-and the runnable scripts.
+The `g-buddy` repo (`AGENTS.md`, `examples/README.md`, `scripts/`) is the
+reference implementation: the six runnable demos and how to run them
+(`examples/README.md`), the USB-link repair script, and host-specific deploy
+helpers. The skill is self-contained — the repo is where a specific board's
+instance lives, not a second copy of this material.

@@ -67,6 +67,37 @@ ip route get 10.1.2.3
 
 Remember: this is exactly what disappears. Re-run the script to make it stick.
 
+### Without the script: the durable `nmcli` equivalent
+
+Everything the script does is four `nmcli` calls. `MAC` is the gadget NIC's
+address (`cat /sys/class/net/<nic>/address`), which is stable across
+re-enumeration:
+
+```bash
+MAC=$(cat /sys/class/net/<nic>/address)
+
+nmcli con add type ethernet con-name "M10 USB link"    \
+  802-3-ethernet.mac-address "$MAC"
+UUID=$(nmcli -t -f UUID,NAME con show | awk -F: '/M10 USB link/{print $1}')
+
+nmcli con mod "$UUID"                                   \
+  802-3-ethernet.mac-address "$MAC" \
+  connection.interface-name "" \
+  ipv4.method manual ipv4.addresses 10.1.2.2/24 ipv4.gateway "" \
+  ipv4.never-default yes ipv4.ignore-auto-routes yes ipv4.dns "" \
+  ipv6.method ignore connection.autoconnect yes
+
+# interface-name "" + the MAC is the whole trick: the profile follows the NIC
+# across renames (eth0 -> enp2s0f0u4c2) and re-enumeration.
+
+nmcli con up "$UUID"
+```
+
+For DHCP-from-the-board instead, swap the address line for
+`ipv4.method auto ipv4.addresses "" ipv4.gateway ""` (the board's
+`isc-dhcp-server` hands out ~`10.1.2.101`). If NM refuses because the NIC is
+`unmanaged`: `sudo nmcli dev set <nic> managed yes`.
+
 ## Verify
 
 ```bash
@@ -91,6 +122,16 @@ ssh root@10.1.2.3                          # password: dfrobot
 
 Once up: `http://10.1.2.3` (local web page), `http://10.1.2.3:8888` (Jupyter,
 enable the service first), `\\10.1.2.3\root` (SMB share).
+
+### Other ways in (and when not to use them)
+
+| Entry point | How | Verdict |
+|---|---|---|
+| **SSH + paramiko** | `10.1.2.3:22`, `root`/`dfrobot` | the default; everything else is a fallback |
+| Jupyter | pre-installed; enable under *Application Services*, browse `:8888`, *New → Python 3* | good for poking at the API, poor for files/deploys |
+| SMB share | `\\10.1.2.3\root` in Windows/`smbclient`; IDLE *File → Save As* to the same path | convenient but **not dotfile-safe** — never use it for backups |
+| VS Code Remote-SSH / Thonny | same SSH endpoint | works; extra RAM on the board, so not for the 512 MB budget |
+| local web page `:80` | DFRobot's home UI | needs `pyboardWeb`, which is the first thing you disable (`system.md`) |
 
 ## Note: Wi-Fi is additive
 
