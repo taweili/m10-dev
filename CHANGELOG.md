@@ -3,6 +3,11 @@
 The skill is installed by symlink, so the version matters: bump the minor
 version for new references or tools, the patch version for corrections.
 
+## 0.4.1 — 2026-10-19
+
+- `board-link.md`: the Clash Verge TUN exclusion now points at the repo's
+  `clash-m10-exclude.sh`; the host variant of the network script was retired.
+
 ## 0.4.0 — 2026-10-19
 
 - **New `scripts/m10-offline-install.py`** — manifest-driven offline install:
