@@ -56,7 +56,12 @@ pip install vosk
 
 ⚠️ **Debian 10 C++ ABI fix required** — the wheel's `libvosk.so` fails with
 `undefined symbol: _ZNSt7__cxx1119basic_ostringstream…`. Extract a Debian 11
-`libstdc++6` on the board and preload it (do **not** install system-wide):
+`libstdc++6` on the board and preload it (do **not** install system-wide).
+
+`m10-offline-install.py` does this end-to-end from a manifest — push the deb,
+`dpkg-deb -x` it, install the wheel offline, then load the real model under
+`LD_PRELOAD` to prove the ABI works (`references/system.md` has the manifest
+schema). The manual steps, for when you are doing it by hand:
 
 ```bash
 # on PC

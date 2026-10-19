@@ -156,6 +156,7 @@ start with `references/board-link.md`.
 | `scripts/m10-snapshot.py` | RGB565 framebuffer → PNG on the PC (`--rotate`, `--census`) |
 | `scripts/m10-net-setup.sh` | durable `10.1.2.2/24` on the USB gadget NIC |
 | `scripts/m10-trim-services.py` | disable DFRobot's daemons, free ~55 MB |
+| `scripts/m10-offline-install.py` | manifest-driven offline wheels/debs/models + import/ABI checks |
 | `scripts/check-docs.py` | validate this skill's file/section references (dev tool) |
 
 Templates (copy, rename, deploy):

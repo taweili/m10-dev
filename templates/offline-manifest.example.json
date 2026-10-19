@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "board_dirs": ["/tmp/offline/wheels"],
+  "files": [
+    {"src": "offline/wheels/example-1.0-py3-none-any.whl", "dst": "/tmp/offline/wheels/"}
+  ],
+  "trees": [
+    {"src": "offline/models/example-model", "dst": "/root/speech-models/example-model"}
+  ],
+  "debs": [
+    {"src": "offline/debs/example.deb", "extract": "/tmp/offline/example"}
+  ],
+  "pip": {
+    "find_links": "/tmp/offline/wheels",
+    "packages": ["example"],
+    "no_deps": true
+  },
+  "checks": ["unihiker", "pinpong"],
+  "abi": {
+    "preload": "/tmp/offline/example/usr/lib/aarch64-linux-gnu/libexample.so.6",
+    "expr": "import example"
+  },
+  "pycompile": ["/root/g-buddy"]
+}

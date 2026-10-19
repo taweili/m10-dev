@@ -11,7 +11,7 @@ This repo is packaged as an agent skill: an `SKILL.md` entry point the agent
 reads on trigger, self-contained references it reads on demand, and the scripts
 and templates it needs to act.
 
-Current version: **0.3.0** (`CHANGELOG.md`).
+Current version: **0.4.0** (`CHANGELOG.md`).
 
 ## Layout
 
@@ -37,11 +37,13 @@ scripts/
   m10-snapshot.py           # RGB565 framebuffer -> PNG on the PC
   m10-net-setup.sh          # durable 10.1.2.2/24 on the USB gadget NIC
   m10-trim-services.py      # disable DFRobot's daemons, free ~55 MB
+  m10-offline-install.py    # manifest-driven offline wheels/debs/models + checks
   check-docs.py             # validate file/section/anchor references (dev tool)
 templates/
   hello_gui.py              # minimal screen
   animated_face.py          # config()-driven character (blink, gaze, moods)
   push_to_talk.py           # mic thread + queue + Vosk UI skeleton
+  offline-manifest.example.json  # complete manifest for m10-offline-install.py
 ```
 
 ## Install
@@ -69,6 +71,8 @@ instead of loading the whole skill up front.
 
 ```bash
 scripts/check-docs.py                       # file refs, `§N` targets, anchors, frontmatter
+scripts/m10-offline-install.py --manifest templates/offline-manifest.example.json \
+  --dry-run --allow-missing                 # manifest schema
 python3 -m py_compile scripts/*.py templates/*.py
 bash -n scripts/*.sh
 ```

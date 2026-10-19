@@ -17,6 +17,12 @@ jobs:
       - name: Docs references, sections and anchors
         run: python3 scripts/check-docs.py
 
+      - name: Offline manifest schema
+        run: >-
+          python3 scripts/m10-offline-install.py
+          --manifest templates/offline-manifest.example.json
+          --dry-run --allow-missing
+
       - name: Python syntax (scripts + templates)
         run: python3 -m py_compile scripts/*.py templates/*.py
 

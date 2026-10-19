@@ -3,6 +3,16 @@
 The skill is installed by symlink, so the version matters: bump the minor
 version for new references or tools, the patch version for corrections.
 
+## 0.4.0 — 2026-10-19
+
+- **New `scripts/m10-offline-install.py`** — manifest-driven offline install:
+  recursive SFTP, `dpkg-deb -x`, index-free pip, import checks, `LD_PRELOAD`
+  ABI load test, `py_compile`; `--dry-run`, `--allow-missing`, strict schema.
+- **New `templates/offline-manifest.example.json`**; CI validates the schema.
+- `system.md` and `speech.md` now use the tool instead of ad-hoc snippets.
+- Retires the repo-local `deploy-offline.py` in favour of a pinned
+  `offline/manifest.json` plus this tool.
+
 ## 0.3.0 — 2026-10-19
 
 Consolidation pass: the skill is now self-contained and checkable.

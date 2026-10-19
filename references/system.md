@@ -120,45 +120,49 @@ USB-C during writes risks the filesystem.
 ## Installing packages without Wi-Fi
 
 `pip3 install` needs the internet, and the board is offline until it is on
-Wi-Fi (`wifi.md`). When it cannot be, download on the PC and push an **offline
-bundle**:
+Wi-Fi (`wifi.md`). When it cannot be, download on the PC, list the artifacts in
+a **manifest**, and let the skill's installer do the push/install/verify:
 
 ```bash
 # on the PC — fetch for arm64 / cp37
 pip3 download --only-binary=:all: --platform manylinux2014_aarch64 \
   --python-version 37 --implementation cp --abi cp37m -d offline/wheels vosk srt
+
+# validate the plan, then execute it
+scripts/m10-offline-install.py --manifest offline/manifest.json --dry-run
+scripts/m10-offline-install.py --manifest offline/manifest.json
 ```
 
-```python
-# push the tree, then install with NO index access
-push_tree("offline/wheels", "/tmp/offline/wheels")          # recursive sftp.put
-run(c, "pip3 install --no-index --find-links /tmp/offline/wheels --no-deps vosk srt", 180)
+A manifest (`version: 1`, paths relative to the file) declares: `board_dirs`,
+`files` and `trees` to push, `debs` to extract (not install), `pip` packages
+to install with `--no-index --find-links`, `checks` modules to import, an `abi`
+`LD_PRELOAD` load test, and `pycompile` dirs. Unknown keys are rejected, and
+local paths may not escape the manifest directory.
+
+```json
+{
+  "version": 1,
+  "board_dirs": ["/tmp/offline/wheels"],
+  "files": [{"src": "wheels/foo-1.0-...whl", "dst": "/tmp/offline/wheels/"}],
+  "debs": [{"src": "debs/libstdc++6_...deb", "extract": "/root/speech-models/extracted_libstdc++"}],
+  "pip": {"find_links": "/tmp/offline/wheels", "packages": ["foo"], "no_deps": true},
+  "checks": ["foo"],
+  "pycompile": ["/root/g-buddy"]
+}
 ```
+
+`templates/offline-manifest.example.json` is a complete example. `no_deps` is
+explicit on purpose — `--no-deps` silently installs broken wheels, so the
+`checks` block has to prove the import actually works.
 
 `.deb` files are usually wanted **only for one shared library** (the Vosk
-`libstdc++` case, `speech.md`) — extract instead of installing, so nothing in
-the DFRobot image moves:
+`libstdc++` case, `speech.md`) — `dpkg-deb -x` extracts instead of installing,
+so nothing in the DFRobot image moves. The installer derives the `.so` from the
+`abi` block and runs a real model load under `LD_PRELOAD`; a wheel can install
+cleanly and still fail to load, which no import check alone catches.
 
-```bash
-run(c, "dpkg-deb -x /tmp/offline/debs/libstdc++6_10.2.1-6_arm64.deb "
-       "/root/speech-models/extracted_libstdc++")
-run(c, "ls /root/speech-models/extracted_libstdc++/usr/lib/aarch64-linux-gnu/")
-```
-
-Always finish a batch install with an **import check** and the real ABI test,
-because a wheel can install cleanly and still fail to load:
-
-```python
-for mod in ["unihiker", "pinpong", "vosk", "pyaudio", "numpy", "PIL"]:
-    print(mod, run(c, f"python3 -c 'import {mod}; print(getattr({mod}, \"__version__\", \"\"))' 2>&1").strip())
-
-run(c, f"LD_PRELOAD={SO} python3 -c 'import vosk; "
-       f"m=vosk.Model(\"{MODEL}\"); vosk.KaldiRecognizer(m, 16000); "
-       f"print(\"model + recogniser OK\")' 2>&1", 60)
-```
-
-Then `python3 -m py_compile` every deployed script on the board — a syntax
-check after transfer costs ~1 s and catches a truncated SFTP write.
+Then `python3 -m py_compile` every deployed script on the board — the manifest's
+`pycompile` step does this in ~1 s and catches a truncated SFTP write.
 
 ## Never touch these
 
