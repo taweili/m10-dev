@@ -3,6 +3,18 @@
 The skill is installed by symlink, so the version matters: bump the minor
 version for new references or tools, the patch version for corrections.
 
+## 0.5.1 — 2026-10-19
+
+- **`scripts/m10-deploy.py` actually launches now.** The launch line was
+  `cd <dir> && DISPLAY=:0 PYTHONUNBUFFERED=1 (cmd > out 2> err &)` — an
+  assignment prefix cannot precede a subshell, so bash rejected the whole
+  command and the app never started. The script printed `launched:` anyway
+  and only later reported `NOT RUNNING`, with empty logs, so it looked like
+  a silent app crash. It now uses `export DISPLAY=:0 PYTHONUNBUFFERED=1 &&`
+  and prints `launch failed:` when the shell returns anything at all, so a
+  broken launch is loud at the point it happens.
+- `README.md`: current version was still 0.4.1 after the 0.5.0 release.
+
 ## 0.5.0 — 2026-10-19
 
 - **New `scripts/m10-clash-exclude.sh`** (from the `g-buddy` repo's `scripts/`):

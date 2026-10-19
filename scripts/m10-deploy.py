@@ -105,9 +105,14 @@ def main():
         if args.stop or args.no_run:
             return
 
-        launch = ("cd %s && DISPLAY=:0 PYTHONUNBUFFERED=1 "
+        # `export` is required, not cosmetic: an assignment prefix cannot
+        # precede a subshell, so `VAR=x (cmd &)` is a bash syntax error and the
+        # launch dies silently. Surface it -- the failure was invisible before.
+        launch = ("cd %s && export DISPLAY=:0 PYTHONUNBUFFERED=1 && "
                   "(%s > %s 2> %s &)" % (args.dest_dir, run_cmd, out, err))
-        run(c, launch, 5)
+        out_launch = run(c, launch, 5).strip()
+        if out_launch:
+            print("launch failed: %s" % out_launch)
         print("launched:", run_cmd)
         if args.wait:
             import time
