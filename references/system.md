@@ -1,5 +1,7 @@
 # 5. Board OS, packages and services
 
+> Reviewed 2026-10-19. Assumes firmware v0.4.2, `unihiker` 0.0.27+ and `pinpong` 0.6.1; version-specific claims are flagged inline.
+
 The M10 is a **throwaway-appliance** Debian box: everything outside `/root/` and
 `/usr/local/lib/python3.7/dist-packages/` is DFRobot's image, and the *only* way
 to move the kernel, coprocessor firmware or DFRobot's own libraries forward is a
@@ -84,6 +86,36 @@ On v0.4.0 there is no pyenv, no 3.8+, and no conda (DFRobot discourages
 conda/miniforge — too much disk on a 16 GB eMMC). Caveat: pyenv changes only the
 *python* on PATH; the DFRobot stack (`unihiker`, `pinpong`) lives in
 `/usr/local/lib/python3.7/`, so scripts that import them must run under 3.7.
+
+## Projects, Python versions and disk
+
+**One interpreter matters.** `unihiker` and `pinpong` live in
+`/usr/local/lib/python3.7/dist-packages/`, so only `python3` (3.7.3) can import
+them. On firmware ≥v0.4.1 pyenv installs other Pythons, but a script that
+imports the DFRobot stack must still run under 3.7. `python3 -m venv` works and
+is worth it for third-party pins, but it does not change that.
+
+Pin dependencies in a `requirements.txt` and install with the offline
+procedure below when Wi-Fi is unavailable. Keep the repo's `examples/` flat:
+image files must sit next to the running `.py`.
+
+**Disk:** `/root` is the eMMC (16 GB, shared with the OS); `/tmp` is **tmpfs**,
+so large models or recordings there consume the 512 MB of RAM.
+
+```bash
+df -h /root; df -h /tmp; du -sh /root/* 2>/dev/null | sort -h | tail
+```
+
+Put speech models under `/root/speech-models/` (eMMC), not `/tmp`. SD cards and
+USB sticks mount under `/media/` — `umount` before removing one, and never write
+to a card that was yanked.
+
+**Time:** TLS and logs depend on a sane clock. Check `timedatectl`; with Wi-Fi
+up, `sudo timedatectl set-ntp true` (and `set-timezone`) fixes drift. A board
+that boots at 1970 will fail certificate checks in cloud SDKs.
+
+Shutdown properly — `sync && systemctl poweroff` — see `recovery.md` §5. Yanking
+USB-C during writes risks the filesystem.
 
 ## Installing packages without Wi-Fi
 
@@ -180,14 +212,14 @@ meaningful when Vosk wants ~300 MB resident.
 ⚠️ Several of these are actually launched from `/etc/init.d` scripts (not
 systemd units) and are re-spawned by a keepalive bash loop, so
 `systemctl disable` alone may not keep them down — kill the spawner too. The
-repo's `scripts/m10-disable-bloat.py` handles that case.
+skill script `scripts/m10-trim-services.py` handles that case.
 
 **Do NOT disable:** `Xorg`, `PulseAudio` (the `Audio` API needs it), `lightdm`,
 `NetworkManager`, `sshd`, `systemd-*`, `isc-dhcp-server` (the board's own DHCP
 for the USB link in `--dhcp` mode), `unclutter` (hides the cursor for touch).
 `wpa_supplicant` must come back if you want Wi-Fi.
 
-There's a helper in the repo: `scripts/m10-disable-bloat.py`.
+Helper: `scripts/m10-trim-services.py` (ships with this skill).
 
 ## Reflash (the only real upgrade path)
 

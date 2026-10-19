@@ -1,5 +1,7 @@
 # 9. Flashing firmware (the only upgrade path)
 
+> Reviewed 2026-10-19. Procedure verified v0.4.0 → v0.4.2 with the amd64 `rkdeveloptool` bundle; timings are one observed run.
+
 Everything on the M10 outside `/root/` and
 `/usr/local/lib/python3.7/dist-packages/` belongs to DFRobot's image. There is
 **no OTA, no `apt upgrade`, and no partial firmware update** — moving the kernel,
@@ -253,13 +255,13 @@ The board comes back at portrait, offline, and empty. Work through this in order
 3. **Let `firstRun.sh` finish** (GD32 burn). Don't pre-seed `/etc/machine-id`.
 4. **Restore the USB link** — a flash resets the NM profile to
    `ipv4.method=link-local`, so the board shows up at `169.254.x.x` under a
-   **new interface name**. Run `scripts/m10-network-setup.sh`
+   **new interface name**. Run `scripts/m10-net-setup.sh`
    (`board-link.md`); do not hand-add the address.
 5. **Rejoin Wi-Fi** — profiles were wiped (`wifi.md`).
 6. **Re-apply landscape** if you want it — `m10-api.md` §7. Check with
    `xdpyinfo | grep dimensions` → expect `240x320` (portrait) or `320x240`.
 7. **Disable the bloat** — a fresh image idles at ~139 MB of 423 MB;
-   `scripts/m10-disable-bloat.py` (`system.md`) brings it to ~74 MB.
+   `scripts/m10-trim-services.py` (`system.md`) brings it to ~74 MB.
 8. **Re-deploy your code and models** — `/root` is empty, including any Vosk
    model (`speech.md`).
 
@@ -304,7 +306,7 @@ the board is in portrait: `GUI(w=320, h=240)` on a 240-wide screen.
 | Board dark after `rd` | write was interrupted; re-enter maskrom and re-flash |
 | Boots but touch is offset | touch not calibrated — long-press Home → Calibrate |
 | Boots, but pinpong does nothing | `firstRun.sh` (GD32 burn) never ran |
-| `169.254.x.x`, board unreachable | NM profile left at link-local → `m10-network-setup.sh` |
+| `169.254.x.x`, board unreachable | NM profile left at link-local → `scripts/m10-net-setup.sh` |
 | Text/UI clipped on the right | board is portrait; re-apply `Rotate` (`m10-api.md` §7) |
 | `apt-get update` DNS failures | no internet — join Wi-Fi first; sources are already correct on v0.4.1+ |
 

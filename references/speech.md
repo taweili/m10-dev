@@ -1,5 +1,7 @@
 # 6. Speech: STT and TTS on the M10
 
+> Reviewed 2026-10-19. Assumes firmware v0.4.2, `unihiker` 0.0.27+ and `pinpong` 0.6.1; version-specific claims are flagged inline.
+
 Cloud integration: `azure-speech.md`.
 
 ## Constraints that decide everything

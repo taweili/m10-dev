@@ -1,5 +1,7 @@
 # 4a. Using M10 functions
 
+> Reviewed 2026-10-19. Assumes firmware v0.4.2, `unihiker` 0.0.27+ and `pinpong` 0.6.1; version-specific claims are flagged inline.
+
 Two libraries, two layers:
 
 ```
@@ -165,6 +167,24 @@ Verified acoustically: sounding the buzzer lifts capture from −50.7 to
 **There is no onboard speaker** — `audio.play()` needs a USB speaker in the
 USB-A port. The buzzer is separate and always works.
 
+**Audio plumbing (host-side checks, run on the board):**
+
+```bash
+aplay -l                              # sinks — the USB speaker appears here
+arecord -l                            # capture — card 1 = rk3308-acodec
+pactl list short sinks; pactl list short sources
+pactl set-default-sink <sink-name>    # what Audio.play() will use
+
+amixer -c 1 scontrols                 # find the capture control name
+alsamixer -c 1                        # adjust gain interactively
+alasctl store                         # persist the mixer state
+```
+
+If the mic is quiet, raise the capture gain rather than moving closer; if it
+clips, check group 0 is `Work` (groups 1–3 are `Mute`, see above). `Audio()`
+uses PulseAudio, so a dead `pulseaudio` looks like a dead mic — restart it
+(`recovery.md` §4).
+
 **Opening a mic yourself (pyaudio):**
 
 ```python
@@ -190,36 +210,27 @@ on the board — resample 22050 → 16000 with `audioop.ratecv` first.
 
 ## 6. Framebuffer (screenshots / visual debug)
 
-`/dev/fb0` (`fb_ili9341`): **240×320, RGB565, 16 bpp**, stride **480 bytes**, no
-padding. **This board's PIL 9.0.1 cannot decode RGB565** — `Image.frombuffer` and
-`frombytes(..., "raw", "RGB565", 0)` both raise `ValueError: unknown raw mode`.
-Decode by hand:
+`/dev/fb0` (`fb_ili9341`) is **240×320, RGB565, 16 bpp**, stride **480 bytes**,
+153 600 bytes total. Two things trip people up:
 
-```python
-# run ON the board → /tmp/frame.png
-import struct
-from PIL import Image
-W, H, STRIDE = 240, 320, 480
-with open("/dev/fb0", "rb") as f:
-    data = f.read()
-compact = b"".join(data[y*STRIDE : y*STRIDE + W*2] for y in range(H))
-px = struct.unpack("<%dH" % (W*H), compact)
-buf = bytearray(W*H*3)
-for i, p in enumerate(px):
-    buf[i*3]   = (p >> 11) << 3            # R
-    buf[i*3+1] = ((p >> 5) & 0x3F) << 2    # G
-    buf[i*3+2] = (p & 0x1F) << 3           # B
-Image.frombytes("RGB", (W, H), bytes(buf)).save("/tmp/frame.png")
+- **PIL 9.0.1 on the board cannot decode RGB565** (`Image.frombuffer` and
+  `frombytes(..., "raw", "RGB565", 0)` raise `ValueError: unknown raw mode`), so
+  the decode has to be done by hand.
+- The framebuffer **stays 240×320 in landscape** — X rotates in userspace, so a
+  `GUI(w=320, h=240)` screen comes back sideways in the raw pixels.
+
+You do not need to write the decoder: `scripts/m10-snapshot.py` uploads it,
+captures the frame, pulls it over SFTP, rotates it on the PC
+(`--rotate 90` for `Rotate="CW"`) and can print a colour census (`--census`).
+
+```bash
+scripts/m10-snapshot.py --rotate 90 --census
 ```
 
-Fetch it over SFTP, then verify with a colour census / ASCII render / frame diff.
 Reading the raw 153 600 bytes is fast; the pixel decode is not — if you need
 timing accuracy, capture raw bytes at the moment of interest and decode on the
-PC. The framebuffer stays 240×320 even in landscape (X rotates in userspace).
-
-Full playbook — colour census, ASCII art, frame diffing, log correlation, the
-GUI↔framebuffer rotation mapping and the tearing pitfall — is in
-**`verify-gui.md`**.
+PC. The full verification playbook (code, colour census, ASCII render, frame
+diff, GUI↔framebuffer mapping, tearing) is in **`verify-gui.md`**.
 
 ## 7. Landscape mode (320×240)
 
@@ -347,6 +358,8 @@ item, and `on_mouse_move` gives you motion without contact state.
 ## 10. Expansion ports, camera and comms
 
 Pin names follow the micro:bit-compatible edge connector (`P0`…`P28` style).
+**Logic is 3.3 V only.** A 5 V sensor output on a GPIO pin can damage the
+pin or the coprocessor — use a level shifter for 5 V parts.
 
 ```python
 d  = Pin(Pin.P20, Pin.IN);   d.value()          # digital in
@@ -386,7 +399,9 @@ DFRobot BLELink accessory. Linux BlueZ (`bleak`, `bluepy`) is the honest path.
 
 **UART / I²C / SPI** — plain Debian devices plus `pinpong.libs.{Uart,I2c,Spi}`;
 overlays are already in `/boot/uEnv.txt` (`uart0`, `i2c1`, `i2c2`, `uart3`,
-`spi-spidev`). `i2c2` is shared with the touch controller and `amic`.
+`spi-spidev`). `i2c2` is shared with the touch controller and `amic`. Bus tools
+worth installing once Wi-Fi is up: `i2c-tools` (`i2cdetect -y 2`), `spi-tools`,
+`minicom`. Use the 3.3 V rail from the board's own header, not a 5 V supply.
 
 ## 11. Gotcha summary
 

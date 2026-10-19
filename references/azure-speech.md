@@ -1,5 +1,7 @@
 # 7. Azure Speech on the M10
 
+> Reviewed 2026-10-19. Assumes `azure-cognitiveservices-speech` 1.11+ on Python 3.7; ARM64 keyword-spotting is broken since 1.11.
+
 The recommended **cloud** speech option: real-time STT + neural TTS, 5 h STT and
 500 K chars TTS free per month. Requires **Wi-Fi** (`wifi.md`) — there is no
 offline mode.

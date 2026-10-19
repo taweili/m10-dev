@@ -1,5 +1,7 @@
 # 4c. Drawing and animation (the whole `unihiker` GUI)
 
+> Reviewed 2026-10-19. Assumes firmware v0.4.2, `unihiker` 0.0.27+ and `pinpong` 0.6.1; version-specific claims are flagged inline.
+
 Ground truth for the on-screen API, read off the shipped source rather than the
 DFRobot wiki. Where this file and `m10-api.md` §1 disagree, **this file wins**.
 

@@ -1,5 +1,7 @@
 # 3. Dev environment with paramiko
 
+> Reviewed 2026-10-19. Assumes firmware v0.4.2, `unihiker` 0.0.27+ and `pinpong` 0.6.1; version-specific claims are flagged inline.
+
 Use **paramiko** for everything: SSH exec, SFTP up/down, long-running scripts.
 It is pure Python, so hosts without `sshpass`/`expect` (or where you would
 rather not put a password on a command line) need no extra tooling. Assume code
@@ -9,6 +11,38 @@ your working dir.
 ```bash
 pip install paramiko    # if missing
 ```
+
+The skill ships the three operations you will repeat most — `scripts/m10-smoke.py`,
+`scripts/m10-deploy.py`, `scripts/m10-snapshot.py` — so the code below is the
+pattern, not a required rewrite.
+
+**Credentials from the environment:** every script here reads `M10_HOST`,
+`M10_USER`, `M10_PASS` (defaults `10.1.2.3` / `root` / `dfrobot`). Use the same
+convention in your own, rather than hardcoding:
+
+```python
+HOST = os.environ.get("M10_HOST", "10.1.2.3")
+USER = os.environ.get("M10_USER", "root")
+PASS = os.environ.get("M10_PASS", "dfrobot")
+```
+
+**SSH keys** beat a password on the command line. Generate one on the PC and
+install it once (paramiko will then use the agent / `~/.ssh/id_*` when you pass
+no password):
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/m10 -C m10
+ssh-copy-id -i ~/.ssh/m10.pub root@10.1.2.3      # password: dfrobot
+# ~/.ssh/config
+#   Host m10
+#     HostName 10.1.2.3
+#     User root
+#     IdentityFile ~/.ssh/m10
+#     StrictHostKeyChecking no
+```
+
+Keys live in `/root/.ssh/`, which a reflash wipes — reinstall after
+`flash-firmware.md`.
 
 ## Canonical client
 
@@ -125,20 +159,18 @@ Python **block-buffers stdout when redirected**, so `print()`s do not appear in
 
 ## Screenshots (verify a GUI you cannot see)
 
-Upload the snapshot script once, run it, pull the PNG. See `m10-api.md` for the
-RGB565 decode snippet. Shape:
+The skill has this wired up: `scripts/m10-snapshot.py` uploads the RGB565
+decoder, captures, pulls the PNG and (with `--rotate 90`) orients it for
+landscape.
 
-```python
-c = client()
-c.open_sftp().put("snap.py", "/tmp/snap.py")
-run(c, "python3 /tmp/snap.py", 30)              # writes /tmp/frame.png on board
-c.open_sftp().get("/tmp/frame.png", "frame.png")
+```bash
+scripts/m10-snapshot.py --rotate 90 --census
 ```
 
-Then verify programmatically: colour census (count pixels), ASCII-art render, or
-frame diffing. Pitfalls: skip-loop tearing, reading during an animation, and the
-GUI↔framebuffer rotation mapping under landscape mode (`m10-api.md` §7 and
-`verify-gui.md`).
+Under the hood it is SFTP put + exec + SFTP get. Then verify programmatically:
+colour census (count pixels), ASCII-art render, or frame diffing — the full
+playbook, including the GUI↔framebuffer rotation mapping and the tearing
+pitfall, is in `verify-gui.md`.
 
 ## Gotchas checklist
 

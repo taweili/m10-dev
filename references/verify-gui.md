@@ -1,7 +1,17 @@
 # 8. Verifying a GUI without looking at it
 
+> Reviewed 2026-10-19. Assumes firmware v0.4.2, `unihiker` 0.0.27+ and `pinpong` 0.6.1; version-specific claims are flagged inline.
+
 When you deploy a screen app over SSH, nobody is watching the panel. These are
 the techniques for proving it rendered correctly.
+
+```bash
+scripts/m10-snapshot.py --rotate 90 --census     # the short version
+```
+
+That captures the framebuffer, decodes RGB565 on the board (PIL there cannot),
+pulls the PNG, rotates it on the PC and prints the dominant colours. The rest
+of this file is the decoder it uses and the ways to read the result.
 
 ## Framebuffer facts
 

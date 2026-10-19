@@ -8,23 +8,40 @@ The M10 is a Debian 10 SBC with a fixed USB-C ethernet gadget at `10.1.2.3`, a
 to the board over paramiko. Nothing is on the board until you push it.
 
 This repo is packaged as an agent skill: an `SKILL.md` entry point the agent
-reads on trigger, plus self-contained references it reads on demand.
+reads on trigger, self-contained references it reads on demand, and the scripts
+and templates it needs to act.
+
+Current version: **0.3.0** (`CHANGELOG.md`).
 
 ## Layout
 
 ```
-SKILL.md                    # entry point — orientation table, non-negotiables, quick start
+SKILL.md                    # entry point — orientation, triage, red lines, non-negotiables
 references/
+  health-check.md           # 0  is it healthy? versions, definition of done, precedence
   board-link.md             # 1  get the board at 10.1.2.3; repair a dead USB gadget link
   wifi.md                   # 2  put the board on Wi-Fi (additive; USB link stays up)
-  paramiko.md               # 3  SSH/SFTP, deploy, background exec, screenshots
+  paramiko.md               # 3  SSH/SFTP, deploy, background exec, screenshots, SSH keys
   m10-api.md                # 4a unihiker GUI/audio + pinpong GPIO/sensors/buttons/buzzer
   gui-drawing.md            # 4b full drawing API, emoji sprites, animation + app patterns
-  system.md                 # 5  Debian 10 EOL, apt fix, offline installs, services
+  system.md                 # 5  Debian 10 EOL, apt fix, offline installs, services, disk/time
   speech.md                 # 6  STT/TTS: Vosk offline, Azure cloud
   azure-speech.md           # 7  Azure Speech real-time STT + neural TTS
   verify-gui.md             # 8  prove a GUI rendered from /dev/fb0 (PIL can't decode RGB565)
-  flash-firmware.md         # 9  rkdeveloptool reflash from Omarchy (destructive — wipe)
+  flash-firmware.md         # 9  rkdeveloptool reflash (destructive — wipes the board)
+  recovery.md               # 10 X/app/audio wedged, safe reboot, when to reflash
+  glossary.md               # 11 jargon: br0, RNDIS, NS2009, tslib, maskrom, …
+scripts/
+  m10-smoke.py              # connectivity, versions, coprocessor, mic, display, snapshot
+  m10-deploy.py             # push + restart a script, duplicate check, logs
+  m10-snapshot.py           # RGB565 framebuffer -> PNG on the PC
+  m10-net-setup.sh          # durable 10.1.2.2/24 on the USB gadget NIC
+  m10-trim-services.py      # disable DFRobot's daemons, free ~55 MB
+  check-docs.py             # validate file/section/anchor references (dev tool)
+templates/
+  hello_gui.py              # minimal screen
+  animated_face.py          # config()-driven character (blink, gaze, moods)
+  push_to_talk.py           # mic thread + queue + Vosk UI skeleton
 ```
 
 ## Install
@@ -43,10 +60,22 @@ skills root.
 ## How it works
 
 `SKILL.md` is the only file the agent reads unconditionally; it carries the
-orientation table, the numbered **non-negotiables** (the foot-guns that break
-M10 work), and a copy-paste paramiko quick start. Each section of
-`SKILL.md` links to one reference file for the matching task, so the agent
-pulls in only what's needed instead of loading ten thousand tokens up front.
+orientation table, a triage table, the red lines, the numbered
+**non-negotiables** (the foot-guns that break M10 work), and the tool inventory.
+Each task links to one reference file, so the agent pulls in only what's needed
+instead of loading the whole skill up front.
+
+## Checks
+
+```bash
+scripts/check-docs.py                       # file refs, `§N` targets, anchors, frontmatter
+python3 -m py_compile scripts/*.py templates/*.py
+bash -n scripts/*.sh
+```
+
+CI runs the same three on every push (`.github/workflows/check.yml`). The docs
+check exists because section refs drift: it caught five dead paths the first
+time it ran.
 
 ## Host assumptions
 

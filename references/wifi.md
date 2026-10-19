@@ -1,5 +1,7 @@
 # 2. Putting the M10 on Wi-Fi
 
+> Reviewed 2026-10-19. Assumes firmware v0.4.2, `unihiker` 0.0.27+ and `pinpong` 0.6.1; version-specific claims are flagged inline.
+
 Only needed for `pip install`, `apt`, cloud APIs, or SSH from elsewhere. **The
 USB link at `10.1.2.3` keeps working the whole time** — Wi-Fi is additive.
 
@@ -53,6 +55,22 @@ nmcli connection up "Home Wi-Fi"
 Autoconnect is on by default; confirm with
 `nmcli -t -f NAME,AUTOCONNECT con show`, or set
 `nmcli con mod "Home Wi-Fi" connection.autoconnect yes`.
+
+**Fixed address on Wi-Fi** (handy when the USB link is not connected):
+
+```bash
+nmcli con mod "Home Wi-Fi" \
+  ipv4.method manual ipv4.addresses 192.168.1.50/24 \
+  ipv4.gateway 192.168.1.1 ipv4.dns "1.1.1.1,9.9.9.9"
+nmcli con up "Home Wi-Fi"
+ip -br addr show wlan0
+```
+
+This is the Wi-Fi profile only — `br0`/`10.1.2.3` is a separate connection and is
+untouched. Prefer a DHCP reservation on the router if you can; a hand-set
+address that collides is a confusing failure. The hostname is `unihiker` by
+default (`hostnamectl set-hostname m10` to change); mDNS/`avahi` is not
+guaranteed, so address the board by IP.
 
 Password storage: `wifi-sec.psk 'literal'` stores plaintext (root-only file,
 `0600`). Or store the derived hash:
@@ -114,4 +132,4 @@ nmcli connection add type wifi con-name "M10 Hotspot" ifname p2p0 \
 | IP but no internet | `cat /etc/resolv.conf`; suspect router client-isolation on guest SSIDs. |
 | "Device or resource busy" | `sudo fuser -v /sys/class/net/wlan0`; `sudo pkill wpa_supplicant; sudo systemctl restart NetworkManager`. |
 | `nmcli con up wifi` hangs | Expected — the factory `wifi` profile points at the invisible `ssid=test`. Create a real connection; optionally `nmcli con del wifi`. |
-| USB link drops after joining Wi-Fi | Shouldn't happen; if it does, re-run `m10-network-setup.sh` (`board-link.md`). |
+| USB link drops after joining Wi-Fi | Shouldn't happen; if it does, re-run `scripts/m10-net-setup.sh` (`board-link.md`). |

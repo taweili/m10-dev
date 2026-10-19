@@ -1,5 +1,7 @@
 # 1. Getting the board at 10.1.2.3 (USB link)
 
+> Reviewed 2026-10-19. Assumes firmware v0.4.2, `unihiker` 0.0.27+ and `pinpong` 0.6.1; version-specific claims are flagged inline.
+
 The M10's USB-C port presents a **USB ethernet gadget** to the PC. The board
 sits at a fixed `10.1.2.3/24` on its `br0` bridge, so the PC needs an address in
 `10.1.2.0/24` on that NIC.
@@ -24,23 +26,27 @@ gone. If the stored NetworkManager profile for that NIC is `Link-Local Only`, NM
 comes back with `169.254.x.x`, there is no route to `10.1.2.0/24`, and the board
 is dark.
 
-## The fix: `m10-network-setup.sh`
+## The fix: `m10-net-setup.sh`
 
 Writes the address into the **NetworkManager profile, keyed to the board's MAC**,
-so it survives renaming and re-enumeration. Lives in the `g-buddy` repo at
-`scripts/m10-network-setup.sh`.
+so it survives renaming and re-enumeration. Ships with this skill at
+`scripts/m10-net-setup.sh`.
 
 ```bash
-./m10-network-setup.sh              # static 10.1.2.2/24 (recommended)
-./m10-network-setup.sh --dhcp       # board's isc-dhcp-server → ~10.1.2.101
-./m10-network-setup.sh --status     # diagnose only, changes nothing
-./m10-network-setup.sh --fix-tun    # also exclude 10.1.2.0/24 from Clash Verge TUN
-./m10-network-setup.sh --dhcp --fix-tun
+scripts/m10-net-setup.sh              # static 10.1.2.2/24 (recommended)
+scripts/m10-net-setup.sh --dhcp       # board's isc-dhcp-server → ~10.1.2.101
+scripts/m10-net-setup.sh --status     # diagnose only, changes nothing
+scripts/m10-net-setup.sh --remove     # delete the profile it created
 ```
 
 It is idempotent; re-run it whenever the link breaks. `--status` is safe to run
-any time and prints: NIC description, address/route, ARP table, ping, the
-kernel's chosen path, and the matching NM profile.
+any time and prints: NIC description, address/route, ARP table, ping, TCP 22,
+the kernel's chosen path, and the matching NM profile.
+
+> A host with a **TUN-mode VPN** (Clash/Mihomo and friends) can capture
+> `10.0.0.0/8` before the direct route applies. Exclude `10.1.2.0/24` in the VPN
+> client. The `g-buddy` repo's variant of this script has `--fix-tun` for
+> Clash Verge on such a host.
 
 ### What it does under the hood
 
@@ -55,40 +61,24 @@ kernel's chosen path, and the matching NM profile.
 4. Activates it, waits for a global IPv4 address, then verifies routing, ping,
    and TCP 22.
 
-### Manual fallback (temporary only)
+### Manual equivalent (no script)
 
-If you must hand-configure and cannot run the script:
-
-```bash
-grep -i product /sys/class/net/*/device/../uevent   # find the NIC
-ip addr add 10.1.2.2/24 dev <nic>
-ip route get 10.1.2.3
-```
-
-Remember: this is exactly what disappears. Re-run the script to make it stick.
-
-### Without the script: the durable `nmcli` equivalent
-
-Everything the script does is four `nmcli` calls. `MAC` is the gadget NIC's
-address (`cat /sys/class/net/<nic>/address`), which is stable across
-re-enumeration:
+The durable fix is four `nmcli` calls. `MAC` is the gadget NIC's address
+(`cat /sys/class/net/<nic>/address`), stable across re-enumeration:
 
 ```bash
 MAC=$(cat /sys/class/net/<nic>/address)
 
-nmcli con add type ethernet con-name "M10 USB link"    \
+nmcli con add type ethernet con-name "M10 USB link" \
   802-3-ethernet.mac-address "$MAC"
 UUID=$(nmcli -t -f UUID,NAME con show | awk -F: '/M10 USB link/{print $1}')
 
-nmcli con mod "$UUID"                                   \
+nmcli con mod "$UUID" \
   802-3-ethernet.mac-address "$MAC" \
   connection.interface-name "" \
   ipv4.method manual ipv4.addresses 10.1.2.2/24 ipv4.gateway "" \
   ipv4.never-default yes ipv4.ignore-auto-routes yes ipv4.dns "" \
   ipv6.method ignore connection.autoconnect yes
-
-# interface-name "" + the MAC is the whole trick: the profile follows the NIC
-# across renames (eth0 -> enp2s0f0u4c2) and re-enumeration.
 
 nmcli con up "$UUID"
 ```
@@ -97,6 +87,9 @@ For DHCP-from-the-board instead, swap the address line for
 `ipv4.method auto ipv4.addresses "" ipv4.gateway ""` (the board's
 `isc-dhcp-server` hands out ~`10.1.2.101`). If NM refuses because the NIC is
 `unmanaged`: `sudo nmcli dev set <nic> managed yes`.
+
+`sudo ip addr add 10.1.2.2/24 dev <nic>` is a **temporary** diagnostic only —
+it is exactly what disappears on re-enumeration. Never leave it as the fix.
 
 ## Verify
 
@@ -116,7 +109,7 @@ ssh root@10.1.2.3                          # password: dfrobot
 | No NIC found at all | Board off/booting, or cable in a **hub/dock** — plug it straight into the PC. |
 | `169.254.x.x` only | NM profile is `IPv4 Link-Local Only` → run the script (it sets `manual`). |
 | Board never answers ARP | Board asleep/off, or wrong NIC. Press the Home button; wait ~10 s; re-plug. |
-| `ip route get` says `dev Mihomo` | Clash Verge TUN is intercepting → `./m10-network-setup.sh --fix-tun` (appends `tun.route-exclude-address: [10.1.2.0/24]` to Merge.yaml; re-apply the profile in Clash Verge). |
+| `ip route get` says `dev Mihomo` (or another TUN) | A TUN-mode VPN is intercepting → exclude `10.1.2.0/24` in the VPN client. Clash Verge on the author's host: `--fix-tun` in the `g-buddy` variant. |
 | Was working, now dark | Gadget re-enumerated → just re-run the script. |
 | SSH works, GUI scripts don't show | Set `DISPLAY=:0` when launching over SSH (see `paramiko.md`). |
 
