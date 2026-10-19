@@ -45,9 +45,8 @@ the kernel's chosen path, and the matching NM profile.
 
 > A host with a **TUN-mode VPN** (Clash/Mihomo and friends) can capture
 > `10.0.0.0/8` before the direct route applies. Exclude `10.1.2.0/24` in the VPN
-> client. On the author's host the `g-buddy` repo's `clash-m10-exclude.sh` (under `scripts/`)
-> appends the exclusion to Clash Verge's `Merge.yaml` and reports whether mihomo
-> already routes `10.0.0.0/8` DIRECT.
+> client. `scripts/m10-clash-exclude.sh` appends the exclusion to Clash Verge's
+> `Merge.yaml` and reports whether mihomo already routes `10.0.0.0/8` DIRECT.
 
 ### What it does under the hood
 
@@ -110,7 +109,7 @@ ssh root@10.1.2.3                          # password: dfrobot
 | No NIC found at all | Board off/booting, or cable in a **hub/dock** — plug it straight into the PC. |
 | `169.254.x.x` only | NM profile is `IPv4 Link-Local Only` → run the script (it sets `manual`). |
 | Board never answers ARP | Board asleep/off, or wrong NIC. Press the Home button; wait ~10 s; re-plug. |
-| `ip route get` says `dev Mihomo` (or another TUN) | A TUN-mode VPN is intercepting → exclude `10.1.2.0/24` in the VPN client. Clash Verge on the author's host: `clash-m10-exclude.sh` in the `g-buddy` repo's `scripts/`. |
+| `ip route get` says `dev Mihomo` (or another TUN) | A TUN-mode VPN is intercepting → exclude `10.1.2.0/24` in the VPN client, or run `scripts/m10-clash-exclude.sh` (Clash Verge). |
 | Was working, now dark | Gadget re-enumerated → just re-run the script. |
 | SSH works, GUI scripts don't show | Set `DISPLAY=:0` when launching over SSH (see `paramiko.md`). |
 

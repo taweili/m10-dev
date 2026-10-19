@@ -99,8 +99,8 @@ The board itself is stock DFRobot firmware (v0.4.2), Debian 10, and EOL — so
 
 ## Related
 
-The `g-buddy` repo (`AGENTS.md`, `examples/README.md`, `scripts/`) is the
-reference implementation: the six runnable demos and how to run them
-(`examples/README.md`), the USB-link repair script, and host-specific deploy
-helpers. The skill is self-contained — the repo is where a specific board's
-instance lives, not a second copy of this material.
+The `g-buddy` repo (`AGENTS.md`, `examples/`) is the reference
+implementation: the six runnable demos and how to run them
+(`examples/README.md`), plus the instance facts for one particular board. The
+skill is self-contained — the repo is where a specific board's instance lives,
+not a second copy of this material.

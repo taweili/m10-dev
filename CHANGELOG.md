@@ -3,6 +3,13 @@
 The skill is installed by symlink, so the version matters: bump the minor
 version for new references or tools, the patch version for corrections.
 
+## 0.5.0 — 2026-10-19
+
+- **New `scripts/m10-clash-exclude.sh`** (from the `g-buddy` repo's `scripts/`):
+  appends `10.1.2.0/24` to Clash Verge's `Merge.yaml` and reports whether
+  mihomo already routes `10.0.0.0/8` DIRECT; `--status` is diagnose-only.
+- `board-link.md` now points at it instead of the repo-local copy.
+
 ## 0.4.1 — 2026-10-19
 
 - `board-link.md`: the Clash Verge TUN exclusion now points at the repo's

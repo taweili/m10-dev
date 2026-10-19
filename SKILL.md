@@ -155,6 +155,7 @@ start with `references/board-link.md`.
 | `scripts/m10-deploy.py` | push + restart one script, check for duplicates, show logs |
 | `scripts/m10-snapshot.py` | RGB565 framebuffer → PNG on the PC (`--rotate`, `--census`) |
 | `scripts/m10-net-setup.sh` | durable `10.1.2.2/24` on the USB gadget NIC |
+| `scripts/m10-clash-exclude.sh` | keep `10.1.2.0/24` out of a Clash Verge TUN (`--status`) |
 | `scripts/m10-trim-services.py` | disable DFRobot's daemons, free ~55 MB |
 | `scripts/m10-offline-install.py` | manifest-driven offline wheels/debs/models + import/ABI checks |
 | `scripts/check-docs.py` | validate this skill's file/section references (dev tool) |
