@@ -115,6 +115,18 @@ evidence:
     one; evdev + your own affine works out of the box →
     `references/m10-api.md` §9.
 
+## Conventions
+
+- **`python3 -m py_compile` before an SSH round trip** catches a syntax error
+  or truncated SFTP write cheaply; `scripts/m10-deploy.py` does it for you.
+- **Leave the board clean** — one instance at a time (`pgrep -af '[a]pp.py'`
+  before trusting a screenshot; the bracket stops grep matching itself), no
+  stray test files in `/root/`. Finish a deploy with `m10-deploy.py` + a
+  snapshot.
+- **"Deploy" = push + launch in the background + leave running.** GUI scripts
+  never exit on their own; stop one only on request, SIGINT first (it
+  releases GPIO/framebuffer) — this is also a red line.
+
 ## Quick start
 
 The fast path is three scripts (all take `M10_HOST/USER/PASS` from the env and

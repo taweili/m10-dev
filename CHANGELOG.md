@@ -3,6 +3,16 @@
 The skill is installed by symlink, so the version matters: bump the minor
 version for new references or tools, the patch version for corrections.
 
+## 0.6.2 — 2026-10-20
+
+- **`SKILL.md`: new "Conventions" section** consolidating the generic workflow
+  rules that used to live in the `g-buddy` repo's `AGENTS.md` (py_compile
+  before an SSH round trip; leave the board clean — one instance at a time,
+  no stray test files, finish a deploy with deploy + snapshot; deploy = push
+  + launch + leave running). The bench file now records only instance facts
+  and points at the skill for board how-to instead of duplicating its
+  reference map, triage table, red lines and quick-start path.
+
 ## 0.6.1 — 2026-10-20
 
 - `references/system.md`: clarified the "Do NOT disable PulseAudio" rule. The
