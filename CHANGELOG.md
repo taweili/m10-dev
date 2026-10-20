@@ -3,6 +3,40 @@
 The skill is installed by symlink, so the version matters: bump the minor
 version for new references or tools, the patch version for corrections.
 
+## 0.7.0 — 2026-10-20
+
+- **`references/azure-speech.md` rewritten for the M10's real constraints.**
+  The reference had three factual problems and one structural gap:
+  - **Version was wrong.** It said "1.11+" as if anything recent would work;
+    the current PyPI release is 1.52.0, and 1.38.0+ links against
+    `GLIBC_2.29`, which the M10's Debian 10 glibc 2.28 rejects at
+    `import` (`OSError: version 'GLIBC_2.29' not found`). 1.34.0 is the
+    newest that actually loads — now pinned explicitly, with a note that
+    1.30.0 and 1.25.0 also work if you need to go back further.
+  - **API drift undocumented.** SDK 1.43 added `SpeechConfig.from_endpoint()`;
+    1.34.0 doesn't have it. Everything in the file used the newer form,
+    which would `AttributeError` on this board. All examples now use
+    `SpeechConfig(subscription=KEY, endpoint=URL)` and the file has an
+    explicit drift table (`Translator` → `translation.TranslationRecognizer`, etc.).
+  - **No M10-integration specifics.** The old reference was generic Azure
+    Speech material that duplicated the SDK quickstart. The rewrite adds
+    what's specific to running this on the M10:
+    - push-stream STT pattern wired to pyaudio (mirrors `g-buddy`'s `03`
+      mic thread) — because the M10's default mic path is unreliable when
+      pulseaudio is masked
+    - raw-PCM TTS (`Raw24Khz16BitMonoPcm`) → pyaudio playback — avoids both
+      the WAV-header-parsing dance and the PulseAudio dependency
+    - word-boundary callbacks with the tick→sample conversion
+    - F0 quota math including the practical 20-tx/60-s throttle
+    - round-trip latency budget (3–8 s end to end)
+    - M10-specific troubleshooting table (stale clock → TLS failure, etc.)
+    - offline-install path (the Azure wheel added to `g-buddy`'s
+      `offline/manifest.json`; version-pinned `pip install ==1.34.0`)
+  - **No numbered sections.** Added `§7.1`–`§7.8` so the file matches the
+    `§N` cross-reference convention the rest of the skill uses.
+
+- `README.md`: current version → 0.7.0.
+
 ## 0.6.2 — 2026-10-20
 
 - **`SKILL.md`: new "Conventions" section** consolidating the generic workflow
