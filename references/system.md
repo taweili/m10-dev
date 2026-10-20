@@ -218,7 +218,9 @@ systemd units) and are re-spawned by a keepalive bash loop, so
 `systemctl disable` alone may not keep them down — kill the spawner too. The
 skill script `scripts/m10-trim-services.py` handles that case.
 
-**Do NOT disable:** `Xorg`, `PulseAudio` (the `Audio` API needs it), `lightdm`,
+**Do NOT disable:** `Xorg`, `PulseAudio` (the `unihiker` **`Audio` API** needs it
+— but **only** that; a script that records/plays via `pyaudio`/`arecord` on the
+ALSA device directly, like `examples/03`, does **not** need pulse), `lightdm`,
 `NetworkManager`, `sshd`, `systemd-*`, `isc-dhcp-server` (the board's own DHCP
 for the USB link in `--dhcp` mode), `unclutter` (hides the cursor for touch).
 `wpa_supplicant` must come back if you want Wi-Fi.

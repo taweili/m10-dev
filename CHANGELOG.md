@@ -3,6 +3,15 @@
 The skill is installed by symlink, so the version matters: bump the minor
 version for new references or tools, the patch version for corrections.
 
+## 0.6.1 — 2026-10-20
+
+- `references/system.md`: clarified the "Do NOT disable PulseAudio" rule. The
+  `unihiker` **`Audio` API** needs it, but a script that records/plays via
+  `pyaudio`/`arecord` on the ALSA device directly does **not** — so a bench
+  whose apps all use `pyaudio` (like `g-buddy`'s 03) can mask pulse. The
+  default keep-list is unchanged; this just stops the rule from reading as
+  "pulse is always required".
+
 ## 0.6.0 — 2026-10-20
 
 - **GUI verification is now "grab the framebuffer and look at the PNG".**

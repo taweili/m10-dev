@@ -11,7 +11,7 @@ This repo is packaged as an agent skill: an `SKILL.md` entry point the agent
 reads on trigger, self-contained references it reads on demand, and the scripts
 and templates it needs to act.
 
-Current version: **0.6.0** (`CHANGELOG.md`).
+Current version: **0.6.1** (`CHANGELOG.md`).
 
 ## Layout
 
