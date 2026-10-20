@@ -3,6 +3,27 @@
 The skill is installed by symlink, so the version matters: bump the minor
 version for new references or tools, the patch version for corrections.
 
+## 0.6.0 — 2026-10-20
+
+- **GUI verification is now "grab the framebuffer and look at the PNG".**
+  `verify-gui.md` was built around an ASCII-art downsample as "the single most
+  useful trick" — a workaround for not being able to see the image. That
+  approximation is gone. The reference now leads with
+  `scripts/m10-snapshot.py --rotate 90` plus a five-step reading order
+  (is it our app at all → orientation/clipping → layout → colour → text →
+  state), and keeps the RGB565 decode, palette and colour census as the
+  numeric follow-ups they are.
+- **`scripts/m10-snapshot.py --crop X,Y,W,H --zoom N`.** Nearest-neighbour
+  upscale (and optional crop after rotation) so a 12 px legend row or a single
+  widget can be *read* in the image instead of being described in ASCII. The
+  crop clamps to the frame rather than raising, because a hand-typed box is
+  normally approximate.
+- `paramiko.md`, `gui-drawing.md`, `m10-api.md` and `README.md`: dropped their
+  "ASCII render" phrasing in favour of the PNG grab.
+- `verify-gui.md`: new first gotcha — **a dead app looks like a rendering bug**.
+  A stock `pyboardgui` launcher screen means the process exited; check
+  `/tmp/<app>.err` before theorising about layout.
+
 ## 0.5.1 — 2026-10-19
 
 - **`scripts/m10-deploy.py` actually launches now.** The launch line was

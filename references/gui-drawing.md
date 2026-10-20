@@ -429,6 +429,8 @@ Measure against the real widget when it matters: render one line, read
 ## 7. Verifying it rendered
 
 Nobody is watching the panel when you deploy over SSH. Every GUI change should
-end with a framebuffer check — colour census, ASCII render, frame diff — see
+end with a framebuffer grab you actually look at: `scripts/m10-snapshot.py
+--rotate 90` writes a PNG of the panel, and `--crop/--zoom` make small details
+readable. Colour census and frame diffing are numeric follow-ups. See
 `verify-gui.md`. Landscape GUIs additionally depend on the Xorg `Rotate`
 configuration in `m10-api.md` §7.

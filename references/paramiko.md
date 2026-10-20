@@ -167,10 +167,10 @@ landscape.
 scripts/m10-snapshot.py --rotate 90 --census
 ```
 
-Under the hood it is SFTP put + exec + SFTP get. Then verify programmatically:
-colour census (count pixels), ASCII-art render, or frame diffing — the full
-playbook, including the GUI↔framebuffer rotation mapping and the tearing
-pitfall, is in `verify-gui.md`.
+Under the hood it is SFTP put + exec + SFTP get. Then **look at the PNG** —
+the image is the verification. Colour census, frame diffing and log correlation
+are numeric follow-ups: the full playbook, including the GUI↔framebuffer
+rotation mapping and the tearing pitfall, is in `verify-gui.md`.
 
 ## Gotchas checklist
 

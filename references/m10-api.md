@@ -229,8 +229,8 @@ scripts/m10-snapshot.py --rotate 90 --census
 
 Reading the raw 153 600 bytes is fast; the pixel decode is not — if you need
 timing accuracy, capture raw bytes at the moment of interest and decode on the
-PC. The full verification playbook (code, colour census, ASCII render, frame
-diff, GUI↔framebuffer mapping, tearing) is in **`verify-gui.md`**.
+PC. The full verification playbook (the PNG grab and how to read it, colour
+census, frame diff, GUI↔framebuffer mapping, tearing) is in **`verify-gui.md`**.
 
 ## 7. Landscape mode (320×240)
 

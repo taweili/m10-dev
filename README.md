@@ -11,7 +11,7 @@ This repo is packaged as an agent skill: an `SKILL.md` entry point the agent
 reads on trigger, self-contained references it reads on demand, and the scripts
 and templates it needs to act.
 
-Current version: **0.5.1** (`CHANGELOG.md`).
+Current version: **0.6.0** (`CHANGELOG.md`).
 
 ## Layout
 
@@ -27,7 +27,7 @@ references/
   system.md                 # 5  Debian 10 EOL, apt fix, offline installs, services, disk/time
   speech.md                 # 6  STT/TTS: Vosk offline, Azure cloud
   azure-speech.md           # 7  Azure Speech real-time STT + neural TTS
-  verify-gui.md             # 8  prove a GUI rendered from /dev/fb0 (PIL can't decode RGB565)
+  verify-gui.md             # 8  grab /dev/fb0 as a PNG and read it (PIL can't decode RGB565)
   flash-firmware.md         # 9  rkdeveloptool reflash (destructive — wipes the board)
   recovery.md               # 10 X/app/audio wedged, safe reboot, when to reflash
   glossary.md               # 11 jargon: br0, RNDIS, NS2009, tslib, maskrom, …
