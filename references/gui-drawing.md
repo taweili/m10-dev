@@ -7,8 +7,10 @@ DFRobot wiki. Where this file and `m10-api.md` §1 disagree, **this file wins**.
 
 Source read: `unihiker` **v0.0.29.0**
 (`github.com/UNIHIKER/unihiker-pypi-lib`, `unihiker/src/unihiker/GUI.py`, 1185
-lines). The stock v0.4.0 firmware ships an older wheel (0.0.27), so check
-`pip3 show unihiker` before relying on a specific extra.
+lines). The stock v0.4.0 firmware ships an older wheel (0.0.27; v0.4.2 has
+0.0.28.5), so check the dist-info directory name
+(`/usr/local/lib/python3.7/dist-packages/unihiker-*.dist-info`) before relying
+on a specific extra — `pip3 show` works but takes 25 s+ on the board.
 
 ## 0. TL;DR
 

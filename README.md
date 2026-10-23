@@ -11,7 +11,7 @@ This repo is packaged as an agent skill: an `SKILL.md` entry point the agent
 reads on trigger, self-contained references it reads on demand, and the scripts
 and templates it needs to act.
 
-Current version: **0.8.2** (`CHANGELOG.md`).
+Current version: **0.9.0** (`CHANGELOG.md`).
 
 ## Layout
 
@@ -31,6 +31,7 @@ references/
   flash-firmware.md         # 9  rkdeveloptool reflash (destructive — wipes the board)
   recovery.md               # 10 X/app/audio wedged, safe reboot, when to reflash
   glossary.md               # 11 jargon: br0, RNDIS, NS2009, tslib, maskrom, …
+  autostart.md              # 12 start a GUI app at boot; device the home menu
 scripts/
   m10-smoke.py              # connectivity, versions, coprocessor, mic, display, snapshot
   m10-deploy.py             # push + restart a script, duplicate check, logs

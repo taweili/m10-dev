@@ -3,6 +3,70 @@
 The skill is installed by symlink, so the version matters: bump the minor
 version for new references or tools, the patch version for corrections.
 
+## 0.9.0 — 2026-10-23
+
+- **New reference `references/autostart.md` — run a GUI app at boot.** The
+  measured chain, with boot timestamps: `graphical.target` → `lightdm` (autologin
+  `root`) → Xorg on `:0` → **`/root/.xsessionrc`** → `systemctl --user start
+  <unit>`. So a *user* systemd unit in `/etc/systemd/user/`, started from the
+  same file DFRobot uses for its home menu, is the supported hook; `rc.local`
+  (measured: it runs *after* lightdm here but inherits no session env at all),
+  system units (no session bus/`/run/user/0`), XDG autostart (no DE reads it)
+  and `cron @reboot` are documented as the wrong answers, with reasons. Ships a template unit (env, `Restart=on-failure`, `KillSignal=SIGINT`,
+  file: logs, explicit `/usr/bin/python3`), the `XDG_RUNTIME_DIR=/run/user/0`
+  tax on every `systemctl --user` over SSH, one-panel-one-owner, cold-boot
+  failure modes, an acceptance test that is a **reboot** (not a `start`), and
+  undo. Wired into `SKILL.md` (map, orientation, triage ×2, non-negotiable 13,
+  a convention) and cross-referenced from `system.md`, `recovery.md`,
+  `paramiko.md`, `health-check.md`, `m10-api.md`.
+- **Fixed: the user-session services were described wrongly.** `PyboardUI`,
+  `PyboardWeb`, `SIoT`, `FileShare`, `ScreenShare` and `Jupyter` are **static**
+  units in `/usr/lib/systemd/user/` launched by a line in `/root/.xsessionrc`,
+  so `systemctl --user disable` is a no-op and `stop` lasts until the next
+  login. The durable switch is that file — `system.md` now says so, and
+  `scripts/m10-trim-services.py` comments the line out (with a `.bak`),
+  `--keep-home-menu` to opt out. Also: Pulse is a **user** unit enabled in
+  root's `default.target`, so `systemctl restart pulseaudio` fails; `recovery.md`
+  §4.2 now drives it with `systemctl --user` (+ runtime dir) and explains that
+  a missing `XDG_RUNTIME_DIR` looks exactly like a dead daemon.
+- **Fixed: `m10-smoke.py`'s framebuffer check was vacuous.** `/dev/fb0` is a
+  *character* device, so `stat -c %s` always answers 0 — the check had been
+  WARNing on every board. It now sizes the panel from
+  `/sys/class/graphics/fb0/{virtual_size,bits_per_pixel}` (240×320 @ 16 bpp =
+  153600 B) and proves a full read with `dd`. `health-check.md`'s manual
+  equivalent was the same bad command; both corrected.
+- **New `session` check in `m10-smoke.py`:** lightdm autologin user, the
+  non-comment `.xsessionrc` autostart lines, home menu on/off, and which app is
+  drawing the panel — `FAIL` on two owners, `WARN` when nothing draws (the
+  black-panel state). Documented in `health-check.md`.
+- **Versions without `pip3`.** Measured: `pip3 --version` 6 s, `pip3 list` 13 s,
+  `pip3 show unihiker` **>25 s** at full CPU. Everything now reads the dist-info
+  directory name instead (`unihiker-0.0.28.5`, `pinpong-0.6.1`) — smoke,
+  `health-check.md`, `system.md`, `flash-firmware.md`, `gui-drawing.md` — and
+  smoke WARNs when `python3` on `PATH` (the pyenv shim on v0.4.1+) disagrees
+  with `/usr/bin/python3`.
+- **`m10-deploy.py --unit`:** with an autostarted app, the old kill-then-launch
+  would be undone by `Restart=on-failure` and end with two panel owners. The new
+  flag delegates to `systemctl --user restart` and reports
+  `ActiveState`/`MainPID`/`NRestarts` plus `journalctl --user`. Verified on the
+  bench (one instance, `NRestarts=0`).
+- **`bluetooth.md`:** folded in the pending note that the sink appears 1–3 s
+  *after* `Connected: yes`, so poll (~10 s) instead of testing once — with the
+  repo-specific pointer replaced by the board-generic rule.
+- **Corrections and measurements:** blanking is already off (`xserver-command=X
+  -s 0 -dpms` in `lightdm.conf`), so a black panel is usually the app, not the
+  backlight; `python3` is the pyenv shim on v0.4.1+ (`pyenv global` = `system`
+  on v0.4.2, so it resolves to 3.7.3 *by luck*); idle memory measured 111 MB
+  used / 299 MB available as shipped; `StandardOutput=file:` truncates per start
+  on systemd 241 (and `journalctl --user` can report "No entries" here);
+  restarting an app that holds an ALSA capture device can log one
+  `[Errno -9999]` while the old instance releases `hw:1,0`; `m10-snapshot.py
+  --census` no longer triggers Pillow's `Image.getdata` DeprecationWarning (it
+  is on by default in smoke's snapshot detail). The "phantom input
+  at boot" is documented as **observed but not isolated** — two turns inside the
+  first 100 s of one boot, not reproduced on restarts — with "ignore contacts
+  for the first ~2-3 s" as cheap insurance rather than as a driver fact.
+
 ## 0.8.2 — 2026-10-23
 
 - **Recorded what Piper costs next to Vosk in one process** (`references/speech.md`,

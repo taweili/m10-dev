@@ -145,7 +145,10 @@ def main():
         print("saved", args.out, im.size)
     if args.census:
         from collections import Counter
-        top = Counter(im.getdata()).most_common(8)
+        # Pillow >=12 deprecates Image.getdata() (it warns on every census), but
+        # the board-ish hosts still run older Pillows, so try the new name first.
+        pixels = getattr(im, "get_flattened_data", None)
+        top = Counter(pixels() if pixels else im.getdata()).most_common(8)
         for colour, n in top:
             print("  %-18s %6d px  (#%02X%02X%02X)" % (colour, n, *colour))
 

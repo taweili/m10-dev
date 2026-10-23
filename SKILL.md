@@ -22,6 +22,7 @@ is on the board until you push it.
 | Hardware | Home/A/B buttons, **onboard mic**, passive buzzer, blue LED (`P25`), light sensor, 6-axis IMU |
 | Audio out | **no onboard speaker** — needs a USB speaker in the USB-A port |
 | GPIO library | `pinpong` 0.6.1 (coprocessor is a GD32VF103 RISC-V) |
+| Boot / autostart | lightdm autologins **root** on `:0`; `/root/.xsessionrc` runs `systemctl --user start <unit>` |
 | Transport | **paramiko** (pure Python) — no `sshpass`/`expect` needed |
 | Firmware | **v0.4.2** (ships as v0.4.0); Debian 10 is **EOL** → `apt` needs `archive.debian.org` |
 
@@ -48,6 +49,7 @@ Read the reference that matches the task; each is self-contained.
 | **X/app/audio wedged, board unresponsive, how to reboot** | `references/recovery.md` |
 | **Flash/reflash firmware** from Linux with `rkdeveloptool` — destructive, read first | `references/flash-firmware.md` |
 | Pair a Bluetooth A2DP speaker / Classic RFCOMM; the PulseAudio un-mask A2DP needs | `references/bluetooth.md` |
+| **Make an app start at boot, replace the home menu** | `references/autostart.md` |
 | Decode the jargon (`br0`, RNDIS, NS2009, tslib, maskrom, …) | `references/glossary.md` |
 
 ## Triage: it's broken, where do I look?
@@ -55,7 +57,7 @@ Read the reference that matches the task; each is self-contained.
 | Symptom | First move |
 |---|---|
 | Nothing on `10.1.2.3` (no ping) | `scripts/m10-net-setup.sh --status` → `board-link.md` |
-| SSH works, screen dark or blank | `recovery.md` §2 — `DISPLAY=:0`, lightdm, `xset` blanking |
+| SSH works, screen dark or blank | `recovery.md` §2 — `DISPLAY=:0`, lightdm, blanking (already off here) |
 | GUI script exits immediately | read `/tmp/app.err` (`paramiko.md`); check `DISPLAY=:0` |
 | Two windows / nonsense screenshot | duplicate instances — kill all, deploy one (`recovery.md` §3) |
 | Content clipped on the right | board is portrait; re-apply `Rotate` (`m10-api.md` §7) |
@@ -64,6 +66,8 @@ Read the reference that matches the task; each is self-contained.
 | Mic silent / picks the wrong device | `m10-api.md` §5 — skip `Loopback`, use `hw:1,0` |
 | No sound / USB speaker silent | `recovery.md` §4 — `lsusb` first (is it detected?), then PulseAudio, then the silent-success trap (`recovery.md` §4) |
 | `apt` 404s | Debian 10 EOL → archive sources (`system.md`) |
+| App is not running after a reboot | nothing supervises it — set up autostart (`autostart.md` §3) |
+| Autostarted app black-panels or double-draws | `autostart.md` §6 — one panel, one owner (home menu off) |
 | Board boots but is empty / portrait / offline | that is a fresh flash — post-flash checklist (`flash-firmware.md`) |
 | Anything else | `scripts/m10-smoke.py` first, then the table in `health-check.md` |
 
@@ -130,6 +134,12 @@ These need an explicit **yes** from the user; they destroy state, change the
     `/etc/pointercal` on the image, so the X/tslib path is dead until you fit
     one; evdev + your own affine works out of the box →
     `references/m10-api.md` §9.
+13. **The panel has one owner.** The home menu (`PyboardUI`) and your app both
+    draw to the framebuffer, so autostart *replaces* the
+    `systemctl --user start PyboardUI` line in `/root/.xsessionrc` — never
+    `rc.local` or a system unit, which get none of the session
+    (`DISPLAY`/`XAUTHORITY`/`XDG_RUNTIME_DIR`) → `references/autostart.md`.
+
 ## Conventions
 
 - **`python3 -m py_compile` before an SSH round trip** catches a syntax error
@@ -141,6 +151,9 @@ These need an explicit **yes** from the user; they destroy state, change the
 - **"Deploy" = push + launch in the background + leave running.** GUI scripts
   never exit on their own; stop one only on request, SIGINT first (it
   releases GPIO/framebuffer) — this is also a red line.
+- **A reboot ends a deploy.** Nothing restarts a hand-launched app; if the
+  bench must survive power cycles, supervise it as a user unit →
+  `references/autostart.md`.
 
 ## Quick start
 

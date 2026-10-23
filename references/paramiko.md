@@ -1,6 +1,6 @@
 # 3. Dev environment with paramiko
 
-> Reviewed 2026-10-19. Assumes firmware v0.4.2, `unihiker` 0.0.27+ and `pinpong` 0.6.1; version-specific claims are flagged inline.
+> Reviewed 2026-10-23. Assumes firmware v0.4.2, `unihiker` 0.0.27+ and `pinpong` 0.6.1; version-specific claims are flagged inline.
 
 Use **paramiko** for everything: SSH exec, SFTP up/down, long-running scripts.
 It is pure Python, so hosts without `sshpass`/`expect` (or where you would
@@ -171,6 +171,35 @@ the image is the verification. Colour census, frame diffing and log correlation
 are numeric follow-ups: the full playbook, including the GUI↔framebuffer
 rotation mapping and the tearing pitfall, is in `verify-gui.md`.
 
+## User units: the `XDG_RUNTIME_DIR` tax
+
+`systemctl --user`, `journalctl --user`, `pactl` and `systemd-run --user` all
+talk to **root's session manager** over a socket in `/run/user/0`. A deploy
+shell has no session env, so every one of them needs the runtime dir or it
+fails misleadingly (`Failed to connect to bus: No such file or directory`,
+`pactl`: `Connection refused` — both read like "the daemon is dead"):
+
+```bash
+export XDG_RUNTIME_DIR=/run/user/0
+systemctl --user status  g-buddy      # ActiveState/MainPID/NRestarts
+systemctl --user restart g-buddy
+journalctl --user -u g-buddy -n 40
+```
+
+Better still, hand supervision to systemd instead of a bare `( … & )` launch —
+`autostart.md` has the unit and the `.xsessionrc` hook, and `Restart=on-failure`
+plus `NRestarts=` is a far better answer to "did it survive?" than `pgrep`.
+
+## Version checks without `pip3`
+
+`pip3 show unihiker` takes **over 25 s** on this board (and `pip3 list` 13 s,
+`pip3 --version` 6 s), so a health probe that shells out to it needs a 45 s
+timeout. Read the dist-info name instead — instant, no interpreter start:
+
+```bash
+ls -d /usr/local/lib/python3.7/dist-packages/unihiker-*.dist-info | sed 's#.*/##'
+```
+
 ## Gotchas checklist
 
 - `timeout=10` on `connect` — the board is sometimes still booting.
@@ -178,5 +207,7 @@ rotation mapping and the tearing pitfall, is in `verify-gui.md`.
 - `exec_command` timeouts raise `PipeTimeout` — treat it as "still running",
   not "failed".
 - Close the client (`c.close()`) when done; leaked sessions accumulate.
+- After a reboot the app is *not* there unless it is a supervised user unit
+  (`autostart.md`); do not "fix" that by launching a second copy.
 - Paths: the board's own scratch space is `/tmp`; the repo's deploy target has
   conventionally been `/root/g-buddy/`.

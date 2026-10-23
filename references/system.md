@@ -87,13 +87,32 @@ conda/miniforge — too much disk on a 16 GB eMMC). Caveat: pyenv changes only t
 *python* on PATH; the DFRobot stack (`unihiker`, `pinpong`) lives in
 `/usr/local/lib/python3.7/`, so scripts that import them must run under 3.7.
 
+**`python3` is a pyenv shim on v0.4.1+.** `which -a python3` shows
+`/root/.pyenv/shims/python3` *before* `/usr/bin/python3`; on v0.4.2 as shipped
+`pyenv global` is `system`, so the shim resolves to 3.7.3 and everything works —
+until someone sets a global 3.12.7, when a bare `python3` silently loses the
+DFRobot stack. Anything that starts by itself (a systemd unit, `rc.local`, a
+cron job) should call **`/usr/bin/python3`** explicitly
+(`references/autostart.md` §3).
+
+**`pip3` is slow here, not broken.** Measured on v0.4.2: `pip3 --version` 6 s,
+`pip3 list` 13 s, `pip3 show unihiker` **over 25 s** (and it burns the CPU
+while doing it). For versions, read the dist-info directory instead — instant:
+
+```bash
+ls -d /usr/local/lib/python3.7/dist-packages/unihiker-*.dist-info \
+      /usr/local/lib/python3.7/dist-packages/pinpong-*.dist-info | sed 's#.*/##'
+# unihiker-0.0.28.5.dist-info
+# pinpong-0.6.1.dist-info
+```
+
 ## Projects, Python versions and disk
 
 **One interpreter matters.** `unihiker` and `pinpong` live in
-`/usr/local/lib/python3.7/dist-packages/`, so only `python3` (3.7.3) can import
-them. On firmware ≥v0.4.1 pyenv installs other Pythons, but a script that
-imports the DFRobot stack must still run under 3.7. `python3 -m venv` works and
-is worth it for third-party pins, but it does not change that.
+`/usr/local/lib/python3.7/dist-packages/`, so only `/usr/bin/python3` (3.7.3)
+can import them. On firmware ≥v0.4.1 pyenv installs other Pythons, but a script
+that imports the DFRobot stack must still run under 3.7. `python3 -m venv` works
+and is worth it for third-party pins, but it does not change that.
 
 Pin dependencies in a `requirements.txt` and install with the offline
 procedure below when Wi-Fi is unavailable. Keep scripts flat: image files must
@@ -186,13 +205,33 @@ Then `python3 -m py_compile` every deployed script on the board — the manifest
 ## Services: what to disable on a 512 MB board
 
 Two levels of systemd here — **system** (`systemctl`) and **root's user
-session** (`systemctl --user`). DFRobot's app daemons are *user* services and
-respawn if you only kill the processes; you must `stop` **and** `disable` them.
+session** (`systemctl --user`). The user manager is a *child of the login*
+(`pam_systemd` starts `systemd --user` when lightdm opens the session), so it
+exists only while root is logged in, and **every `systemctl --user` call from an
+SSH shell needs the runtime dir** or it answers
+`Failed to connect to bus: No such file or directory`:
 
-As shipped the board idles at **~210 MB used of 423 MB** (~50 %). Biggest
-consumers: pyboard web UI ~54 MB, SMB ~25 MB, Xorg ~20 MB, PulseAudio ~13 MB,
-xrdp ~8 MB, SiOt ~6 MB, VNC ~3 MB, plus NetworkManager, lightdm, gettys and the
-systemd daemons.
+```bash
+export XDG_RUNTIME_DIR=/run/user/0     # root's session; per-command is fine too
+```
+
+DFRobot's app daemons are *user* units — but two different machineries, and
+only one of them survives a reboot:
+
+| Unit | Where it lives | How it starts | Durable switch |
+|---|---|---|---|
+| `PyboardUI`, `PyboardWeb`, `ScreenShare`, `SIoT`, `FileShare`, `Jupyter` | `/usr/lib/systemd/user/` (`static`, no `[Install]`) | a line in **`/root/.xsessionrc`** | comment that line (back it up first) |
+| `pulseaudio` (+ `.socket`) | `/usr/lib/systemd/user/`, `enabled` in `default.target` | the user manager, at login | `systemctl --user disable pulseaudio` (but A2DP needs it — `bluetooth.md`) |
+
+`systemctl --user disable PyboardUI.service` therefore **prints nothing and
+changes nothing** (a static unit is already "disabled"), and `stop` lasts only
+until the next login — `.xsessionrc` starts it again. That is the trap: the
+durable home-menu switch is the session file, not systemd.
+
+As measured on v0.4.2 right after boot with the home menu up: **111 MB used of
+423 MB** (294 MB buff/cache, 299 MB available). Biggest consumers: pyboard web
+UI ~54 MB, SMB ~25 MB, Xorg ~20 MB, PulseAudio ~13-24 MB, xrdp ~8 MB, SiOt ~6 MB,
+VNC ~3 MB, plus NetworkManager, lightdm, gettys and the systemd daemons.
 
 **System-level:**
 
@@ -208,15 +247,16 @@ sudo systemctl disable --now cron                # cron              ~1 MB
 sudo systemctl disable --now SiOt_unihiker       # DFRobot IoT       ~6 MB
 ```
 
-**User-level (root's session):**
+**User-level (root's session)** — stop now, but see the table above for what
+makes it stick:
 
 ```bash
-systemctl --user disable --now PyboardUI.service
-systemctl --user disable --now PyboardWeb.service
-systemctl --user disable --now ScreenShare.service
-systemctl --user disable --now SIoT.service
-systemctl --user disable --now FileShare.service
+export XDG_RUNTIME_DIR=/run/user/0
+systemctl --user stop PyboardUI.service PyboardWeb.service \
+                   ScreenShare.service SIoT.service FileShare.service
 pkill -9 -f 'pyboardgui|pyboardWeb|x0vncserver|SiOt|smbd|nmbd'
+# and, to survive the next login/reboot, comment the matching lines in
+# /root/.xsessionrc — that file is the real autostart (references/autostart.md)
 ```
 
 Result: **~129 MB → ~74 MB used** (17 % of 423 MB), i.e. ~55 MB freed —
@@ -235,7 +275,13 @@ A2DP speaker** also needs pulse — see `references/bluetooth.md`), `lightdm`,
 for the USB link in `--dhcp` mode), `unclutter` (hides the cursor for touch).
 `wpa_supplicant` must come back if you want Wi-Fi.
 
-Helper: `scripts/m10-trim-services.py` (ships with this skill).
+Helper: `scripts/m10-trim-services.py` (ships with this skill; it edits
+`.xsessionrc` too, so the menu stays down after a reboot).
+
+**Running your own app at boot is the same mechanism, inverted:** a user unit in
+`/etc/systemd/user/` started from that same `.xsessionrc` line —
+`references/autostart.md`, which also explains why `rc.local` and system units
+do not work here.
 
 ## Reflash (the only real upgrade path)
 
@@ -258,7 +304,8 @@ and the post-flash checklist.
 cat /opt/unihiker/Version        # firmware
 cat /etc/debian_version          # 10.11
 uname -a                         # kernel
-python3 --version; pip3 --version
+/usr/bin/python3 --version       # 3.7.3 — the one the DFRobot stack needs
+ls -d /usr/local/lib/python3.7/dist-packages/unihiker-*.dist-info | sed 's#.*/##'
 dpkg -l linux-4.4-rock-pi-s-latest    # expect 'hi' (hold)
 apt-get update 2>&1 | grep -E 'Err|404'   # expect nothing after the fix
 free -m                          # RAM headroom (512 MB total)

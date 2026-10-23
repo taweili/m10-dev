@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
 """Disable DFRobot's stock bloat on a 512 MB M10 and report the memory freed.
 
-    ./m10-trim-services.py            # stop + disable + kill respawners
-    ./m10-trim-services.py --dry-run  # show what would be stopped
+    ./m10-trim-services.py                  # stop + disable + kill respawners
+    ./m10-trim-services.py --dry-run        # show what would be stopped
+    ./m10-trim-services.py --keep-home-menu # keep the menu autostart line
 
 Two layers matter here: **system** systemd units and **root's user session**.
 DFRobot's app daemons are user services, and several are launched from
 /etc/init.d and re-spawned by a keepalive loop — so `systemctl disable` alone
 does not keep them down; the spawner must be killed too.
+
+The user units are `static` (no `[Install]`), so `disable` is a no-op and `stop`
+lasts only until the next login: **the durable switch for the home menu is the
+`systemctl --user start PyboardUI` line in /root/.xsessionrc**, which this script
+comments out (with a `.bak`, once). That is also the line to replace with your
+own app — references/autostart.md.
 
 Keeps sshd, NetworkManager, isc-dhcp-server, wpa_supplicant, dbus, systemd-*,
 lightdm, Xorg, pulseaudio, udev and gettys. Read references/system.md before
@@ -69,6 +76,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--keep-home-menu", action="store_true",
+                    help="leave the PyboardUI autostart line in /root/.xsessionrc")
     args = ap.parse_args()
     DRY = args.dry_run
 
@@ -91,6 +100,19 @@ def main():
             run(c, "%s systemctl --user stop %s 2>&1" % (USER_ENV, unit))
             run(c, "%s systemctl --user disable %s 2>&1" % (USER_ENV, unit))
             print("  %-24s stopped + disabled" % unit)
+
+        if args.keep_home_menu:
+            print("\n-- home menu autostart -- kept (--keep-home-menu)")
+        else:
+            print("\n-- home menu autostart (/root/.xsessionrc) --")
+            # static units do not survive a login on their own: this line is
+            # what actually starts pyboardgui, so comment it (idempotent).
+            run(c, "cp -n /root/.xsessionrc /root/.xsessionrc.bak 2>/dev/null")
+            run(c, "sed -i 's|^systemctl --user start PyboardUI|"
+                    "# systemctl --user start PyboardUI|' /root/.xsessionrc")
+            after = run(c, "grep -nE '^(# ?)?systemctl --user start' "
+                           "/root/.xsessionrc 2>/dev/null | tr '\\n' '; '")
+            print("  autostart now: %s" % (after or "(none)"))
 
         print("\n-- kill respawners --")
         # the keepalive wrapper re-launches smbd, so it dies first

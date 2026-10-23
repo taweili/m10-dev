@@ -1,6 +1,6 @@
 # 4a. Using M10 functions
 
-> Reviewed 2026-10-19. Assumes firmware v0.4.2, `unihiker` 0.0.27+ and `pinpong` 0.6.1; version-specific claims are flagged inline.
+> Reviewed 2026-10-23. Assumes firmware v0.4.2, `unihiker` 0.0.27+ and `pinpong` 0.6.1; version-specific claims are flagged inline. Touch behaviour re-checked on `unihiker` 0.0.28.5.
 
 Two libraries, two layers:
 
@@ -350,6 +350,14 @@ Locate the device by capability (`ABS_X`+`ABS_Y`+`BTN_TOUCH`, or name
 guess-calibration is usually wrong in offset and sometimes in axis order — fine
 as a fallback, not as the answer.
 
+**Do not trust the first seconds of input.** On one first boot (autostart,
+`autostart.md` §7) a touch-driven app ran **two turns nobody asked for** inside
+the first 100 s, with the panel untouched; a later restart reproduced nothing
+over 70 s idle, so the cause was not isolated — a stray evdev contact while the
+session/X come up is the likely one. Cheap insurance either way: after opening
+the device, ignore contacts for **~2-3 s** and require a real `BTN_TOUCH`
+down-edge, rather than treating "contact" as "the user is talking".
+
 **Gestures are yours to derive** on release, from duration + travel +
 displacement: tap (`<0.35 s`, `<14 px`), long press (`≥0.6 s`, small travel),
 drag, swipe (≥24 px travel, dominant axis). Use the **release** position, not
@@ -425,6 +433,9 @@ worth installing once Wi-Fi is up: `i2c-tools` (`i2cdetect -y 2`), `spi-tools`,
 13. Raw touch is uncalibrated 12-bit ADC — fit the affine yourself → §9.
 14. The rest of the GUI API, and the source-verified corrections to the wiki,
     are in `gui-drawing.md`.
+15. The first seconds of input after a boot are not trustworthy (two
+    unexplained turns on one boot): debounce contacts for ~2-3 s and require a
+    real down-edge → §9.
 
 ## Sources
 

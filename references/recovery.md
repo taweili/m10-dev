@@ -40,12 +40,16 @@ DISPLAY=:0 xdpyinfo | grep dimensions
 **X runs but the screen is blank/black**:
 
 ```bash
+DISPLAY=:0 xset q | grep -A2 'Screen Saver\|DPMS'   # is blanking even on?
 DISPLAY=:0 xset s off; DISPLAY=:0 xset -dpms; DISPLAY=:0 xset s noblank
 ```
 
-X blanking and DPMS can blank the panel after minutes of no touch input — the
-app is fine, the backlight is off. Good practice for any long-running GUI:
-disable blanking at start-up, or re-enable it deliberately.
+On this image **blanking is already off**: `lightdm.conf` starts
+`Xorg -s 0 -dpms` (screensaver timeout 0, DPMS disabled), so a black panel is
+usually *your app*, not the backlight — check `pgrep -af '[y]our_app.py'` and
+`/tmp/*.err` first. If you do need a different policy, edit `xserver-command=`
+in `/etc/lightdm/lightdm.conf` and restart lightdm, rather than racing `xset`
+from inside the app.
 
 **Content is clipped on the right / sideways** — the board is in portrait while
 the script assumes landscape. Fix `Rotate` in `m10-api.md` §7,
@@ -55,11 +59,13 @@ restart lightdm, and relaunch.
 different display, or it drew once and died. Check its stderr
 (`references/paramiko.md`, buffering trap) before blaming X.
 
-**The app crashed and no home menu is running** — on a trimmed board
-(`scripts/m10-trim-services.py`, `system.md`), `pyboardgui` is disabled, so a
+**The app crashed and no home menu is running** — on a board where the menu was
+replaced (trimmed, or an app autostarted in its place — `autostart.md`), a
 crashed app leaves the panel **black** instead of returning to the home screen.
-Check `pgrep -af '[a]pp.py'`: if nothing is running, the app died — read
-`/tmp/app.err` for the traceback and relaunch.
+That is what `Restart=on-failure` is for: with the app supervised a crash is a
+3 s pause, not a dead bench — `systemctl --user status <unit>` and its
+`NRestarts=` tell you it happened. Unsupervised, read `/tmp/app.err` for the
+traceback and relaunch.
 
 ## 3. Script recovery
 
@@ -112,19 +118,26 @@ software will fix that.
 
 ### 4.2 PulseAudio
 
+Pulse is a **user** unit here (`/usr/lib/systemd/user/pulseaudio.service`,
+enabled in root's `default.target`), *not* a system service — so
+`systemctl restart pulseaudio` fails with "Unit pulseaudio.service not found".
+Drive it inside root's session:
+
 ```bash
-pactl info | head -3                   # PulseAudio alive?
-systemctl restart pulseaudio           # if it's a managed service
-pulseaudio --start                     # if the service is masked (trimmed bench)
-pactl list short sinks                 # the USB speaker appears as a sink
+export XDG_RUNTIME_DIR=/run/user/0     # required from an SSH shell
+pactl info | head -3                   # is a daemon answering?
+systemctl --user status pulseaudio
+systemctl --user restart pulseaudio
+pactl list short sinks                 # the speaker appears as a sink
 pactl set-default-sink <sink-name>     # route Audio.play() to it
 alsactl restore                        # re-apply the saved mixer state
 ```
 
-On a trimmed bench (`m10-trim-services.py`), the `pulseaudio.service` unit is
-masked, so `systemctl restart` fails with "Unit file does not exist". Start
-the daemon directly with `pulseaudio --start` for ad-hoc testing; it runs as a
-user daemon under `/run/user/0/pulse/`.
+Without `XDG_RUNTIME_DIR`, `pactl` looks for a socket that is not there and
+reports "Connection refused" — which reads like a dead daemon and is not. If
+the unit is masked (trimmed bench, `system.md`), start the daemon directly with
+`pulseaudio --start` for ad-hoc testing; it then runs as a user daemon under
+`/run/user/0/pulse/`.
 
 ### 4.3 The silent-success trap
 
@@ -161,8 +174,11 @@ After any reboot:
 1. `scripts/m10-smoke.py --no-snapshot` — link, versions, coprocessor.
 2. Check orientation (`xdpyinfo`) and re-apply landscape if needed.
 3. Confirm the trimmed service list is still down (`pgrep -af 'pyboard|smbd|SIoT'`).
-4. Relaunch your app (deploy is push + background launch; a reboot does not
-   restart it — there is no supervision).
+4. Relaunch your app (deploy is push + background launch). A **hand-launched**
+   app does not come back — there is no supervision. If it is a user unit
+   started from `~/.xsessionrc` (`autostart.md`), it is already up: check
+   `systemctl --user status <unit>` (with `XDG_RUNTIME_DIR=/run/user/0`) instead
+   of launching a second copy.
 
 ## 6. Filesystem or boot damage
 
@@ -185,7 +201,8 @@ This is the point where recovery stops: reflash (`flash-firmware.md`). It wipes
 | No ping / no SSH | `board-link.md` — NIC/NM/route, then replug |
 | SSH, no X | `systemctl restart lightdm` |
 | App crashed, panel black | trimmed board → no home menu; read `/tmp/app.err` |
-| Screen blank after idle | `xset s off -dpms` |
+| Screen blank after idle | usually the app, not the backlight — `xset q`, then `/tmp/*.err` (§2) |
+| App gone after a reboot | nothing supervises a hand launch — `autostart.md` |
 | Wrong orientation / clipped | re-apply `Rotate`, restart lightdm |
 | App hung / duplicated | `pkill` bracket trick, relaunch one |
 | Buzzer/GPIO wedged | kill, then reboot if it persists |

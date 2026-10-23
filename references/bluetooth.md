@@ -118,6 +118,15 @@ from your app (`pactl info | grep 'Default Sink'`) so a silent run is
 diagnosable after the fact — printing something like
 `play paplay -> bluez_sink.…a2dp_sink` makes a silent failure self-explanatory.
 
+**Poll for the sink, don't test once.** On a *fresh* connect the card appears
+**1–3 s after** `Connected: yes` (`module-bluez5-device` waits for the
+transport), so a script that checks `pactl list short sinks` the instant
+`connect` returns sees no `bluez_sink` and misdiagnoses the healthy case as
+"connected but no sink" — then performs the disconnect/connect cycle above for
+nothing. Wait up to ~10 s for the sink before concluding anything, and log the
+sink the audio actually went to on every play — one line turns "was it silent
+because the link dropped" into an answer.
+
 ## 3. Auto-reconnect after reboot
 
 Trusted A2DP devices reconnect automatically **only if PulseAudio is running**

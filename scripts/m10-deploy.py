@@ -6,10 +6,16 @@
     ./m10-deploy.py app.py --run "python3 app.py --flag" --name app
     ./m10-deploy.py --stop --name app
     ./m10-deploy.py app.py --no-run --wait 0
+    ./m10-deploy.py app.py --name app --unit app   # supervised by a user unit
 
 "Deploy" means: syntax-check locally, SFTP push, kill the stale instance,
 launch in the background with DISPLAY=:0 and PYTHONUNBUFFERED=1, then show the
 first lines of stdout/stderr and confirm exactly one process is running.
+
+**If the app is autostarted** (a systemd user unit started from
+/root/.xsessionrc, references/autostart.md), do not pkill it: systemd would
+restart it and the launch below would produce a second copy drawing over the
+first. Pass `--unit <name>` and the restart is delegated to systemd.
 
 Why the shape: a foreground `exec_command` blocks until the client timeout
 (PipeTimeout) and `pkill -f` matches its own shell unless you use the bracket
@@ -56,6 +62,8 @@ def main():
     ap.add_argument("--name", help="process/pkill name (default: first file's basename)")
     ap.add_argument("--run", help="command to launch (default: python3 <name>.py)")
     ap.add_argument("--stop", action="store_true", help="stop the process and exit")
+    ap.add_argument("--unit", help="systemd user unit that runs the app: restart "
+                                   "it instead of pkill + launch (autostart.md)")
     ap.add_argument("--no-run", action="store_true", help="push only")
     ap.add_argument("--wait", type=float, default=4.0,
                     help="seconds to wait before reading logs (default 4)")
@@ -97,12 +105,44 @@ def main():
                 print("put %-50s -> %s" % (path, remote))
             sftp.close()
 
-        # stop the stale instance (SIGINT first: the unihiker exit handler
-        # releases the framebuffer/GPIO; SIGKILL as the fallback)
-        run(c, "pkill -INT -f '%s'; sleep 1; pkill -KILL -f '%s'" % (bracket(name), bracket(name)), 10)
-        print("stopped old '%s' (if any)" % name)
+        if args.unit:
+            # systemd owns the process: killing it would be undone by
+            # Restart=on-failure and then collide with our own launch.
+            uenv = "XDG_RUNTIME_DIR=/run/user/0"
+            if args.stop or args.no_run:
+                print(run(c, "%s systemctl --user stop %s" % (uenv, args.unit), 30).strip()
+                      or "stopped %s" % args.unit)
+                return
+            print(run(c, "%s systemctl --user restart %s" % (uenv, args.unit), 30).strip()
+                  or "restarted %s" % args.unit)
+        else:
+            # stop the stale instance (SIGINT first: the unihiker exit handler
+            # releases the framebuffer/GPIO; SIGKILL as the fallback)
+            run(c, "pkill -INT -f '%s'; sleep 1; pkill -KILL -f '%s'" % (bracket(name), bracket(name)), 10)
+            print("stopped old '%s' (if any)" % name)
 
         if args.stop or args.no_run:
+            return
+
+        if args.unit:
+            if args.wait:
+                import time
+                time.sleep(args.wait)
+            print("\n-- unit --")
+            print(run(c, "XDG_RUNTIME_DIR=/run/user/0 systemctl --user show -p "
+                         "ActiveState -p MainPID -p NRestarts %s" % args.unit, 20).strip())
+            print("\n-- journal --")
+            print(run(c, "XDG_RUNTIME_DIR=/run/user/0 journalctl --user -u %s "
+                         "-n 40 --no-pager 2>/dev/null | tail -40" % args.unit, 30).rstrip()
+                  or "(no journal entries)")
+            if run(c, "test -s %s && echo y" % err):
+                print("\n-- stderr (%s) --" % err)
+                print(run(c, "tail -40 %s" % err).rstrip())
+            pids = run(c, "pgrep -af '%s' | grep -v pgrep" % bracket(name)).strip()
+            lines = [ln for ln in pids.splitlines() if ln.strip()]
+            print("\nrunning (%d instance%s)%s" % (
+                len(lines), "" if len(lines) == 1 else "s",
+                ": " + lines[0] if lines else " — NOT RUNNING"))
             return
 
         # `export` is required, not cosmetic: an assignment prefix cannot

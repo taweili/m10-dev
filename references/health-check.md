@@ -1,6 +1,8 @@
 # 0. Health check, versions, and what "working" means
 
-> Reviewed 2026-10-19. This file is the version arbiter; the other references state their version assumptions at the top.
+> Reviewed 2026-10-23 (v0.4.2 on the bench: `unihiker` 0.0.28.5, `pinpong` 0.6.1).
+> This file is the version arbiter; the other references state their version
+> assumptions at the top.
 
 Read this first when you pick up a board you did not just configure. It answers
 three questions in one run: **is it reachable, is the hardware alive, and which
@@ -21,6 +23,7 @@ failed:
 |---|---|
 | `connect` | SSH reachable (`references/board-link.md` if not) |
 | `versions` | firmware marker, Debian, Python, `unihiker`, `pinpong`, PIL |
+| `session` | lightdm autologin, `/root/.xsessionrc` autostart line, user units, and **who owns the panel** (home menu vs your app) |
 | `resources` | RAM headroom (512 MB total) and `/root` free space |
 | `X display` | X is up on `:0`, and at which dimensions (portrait vs landscape) |
 | `framebuffer` | `/dev/fb0` readable and 153 600 bytes |
@@ -31,6 +34,11 @@ failed:
 `WARN` is not failure: a firmware newer than these notes, or PIL missing on the
 PC, is expected drift. `FAIL` means stop and fix before drawing conclusions.
 
+The `session` check is the cheap answer to "why is my app not on screen?": it
+reports the autostart line in `/root/.xsessionrc`, the active user units, and
+whether `pyboardgui` is fighting your app for the framebuffer
+(`autostart.md` §6).
+
 ## Manual equivalent
 
 When paramiko or the scripts are unavailable, the same checks by hand:
@@ -38,12 +46,16 @@ When paramiko or the scripts are unavailable, the same checks by hand:
 ```bash
 ssh root@10.1.2.3
 
-cat /opt/unihiker/Version; cat /etc/debian_version; python3 --version
-pip3 show unihiker pinpong | grep -E '^(Name|Version)'
-python3 -c 'import PIL; print(PIL.__version__)'
+cat /opt/unihiker/Version; cat /etc/debian_version
+/usr/bin/python3 --version               # 3.7.3 — the one with unihiker/pinpong
+ls -d /usr/local/lib/python3.7/dist-packages/{unihiker,pinpong}-*.dist-info
+                                         # versions, instantly; `pip3 show` takes 25 s+
+/usr/bin/python3 -c 'import PIL; print(PIL.__version__)'
 free -m; df -h /root
 DISPLAY=:0 xdpyinfo | grep dimensions
 stat -c %s /dev/fb0                      # expect 153600
+cat /root/.xsessionrc                    # what autostarts in the session
+export XDG_RUNTIME_DIR=/run/user/0; systemctl --user list-units --state=active
 
 python3 - <<'PY'
 from pinpong.board import Board
@@ -68,11 +80,19 @@ Check before relying on a feature.
 | `pinpong` | 0.6.1 | 0.6.x | 0.6.x | newer |
 | `apt` sources | **broken (Buster EOL)** | archive.debian.org | archive.debian.org | archive |
 
-`unihiker` has no `__version__` attribute — use `pip3 show unihiker`. The wheel
-on PyPI can be newer than the board's; `gui-drawing.md` was read from
+`unihiker` has no `__version__` attribute, so read the **dist-info directory
+name** (`.../dist-packages/unihiker-0.0.28.5.dist-info`) — `pip3 show unihiker`
+is correct but takes **over 25 s** on this board, and `pip3 list` 13 s. The
+wheel on PyPI can be newer than the board's; `gui-drawing.md` was read from
 **0.0.29.0**, so if the board is on 0.0.27, check before using an extra
 (`load_font`, `UNIConfig.set_brightness`, `add_text_box`) — the core drawing API
 in that file is stable across both.
+
+Measured on the bench's v0.4.2 board (2026-10-23): Debian 10.11,
+`/usr/bin/python3` **3.7.3**, `unihiker` **0.0.28.5**, `pinpong` **0.6.1**,
+pyenv 2.5.7 with `pyenv global` = `system`, and `python3` on `PATH` is the pyenv
+shim (so `/usr/bin/python3` and `python3` agree today, by luck). `apt` sources
+already point at `archive.debian.org`.
 
 ## Definition of done for a deploy
 
@@ -98,6 +118,7 @@ A deployed script is not "done" when the push succeeds:
 | `coprocessor` | `system.md` (firmware/`firstRun.sh`) and `m10-api.md` §1 |
 | `microphone` | `m10-api.md` §5 — `Loopback` trap, gain |
 | `resources` | `system.md` — trim services (`scripts/m10-trim-services.py`) |
+| `session` | `autostart.md` — autostart line, user units, one-panel-owner; `recovery.md` §3 |
 | versions unexpected | `system.md` — firmware ladder; `flash-firmware.md` to move |
 
 ## Precedence when sources disagree

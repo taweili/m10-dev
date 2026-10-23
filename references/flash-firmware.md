@@ -270,7 +270,9 @@ The board comes back at portrait, offline, and empty. Work through this in order
 
 ```bash
 cat /opt/unihiker/Version              # expect v0.4.2
-pip3 show unihiker                     # 0.0.28.5 for v0.4.1+ (was 0.0.27 on v0.4.0)
+ls -d /usr/local/lib/python3.7/dist-packages/unihiker-*.dist-info
+                                       # 0.0.28.5 on v0.4.2 (0.0.27 on v0.4.0);
+                                       # instant, unlike `pip3 show` (25 s+)
 pyenv versions                         # v0.4.1+ only: 3.7.3 / 3.8.5 / 3.12.7
 which uv                               # v0.4.5 only
 grep -h '^deb' /etc/apt/sources.list   # v0.4.1+: archive.debian.org
@@ -293,7 +295,8 @@ Then confirm the display (`verify-gui.md`) — deploy a GUI script and read
 `/dev/fb0` back. Expect the rendered content to be **clipped on the right** while
 the board is in portrait: `GUI(w=320, h=240)` on a 240-wide screen.
 
-`unihiker` exposes no `__version__`; use `pip3 show unihiker`.
+`unihiker` exposes no `__version__`; the dist-info directory name is the
+version (`…/dist-packages/unihiker-0.0.28.5.dist-info`).
 
 ## Failure modes
 
