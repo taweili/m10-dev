@@ -184,6 +184,16 @@ from unihiker import Audio; Audio().play("/tmp/out.wav")
 MIT). The `piper-tts` wheel is now 3.9+, so on Py 3.7 the binary is the only
 route.
 
+**Piper next to Vosk, one process** (measured 2026-10 on the same board): Vosk
+small (~300 MB) + Piper `medium` coexist on the 512 MB board — peak **308 MB
+used** of the 423 MB `free` reports, no OOM, only light swap — so a "listen,
+then answer out loud" loop is fine. Budget the seconds: 10–14 s of piper for a
+2–4 s utterance (RTF 4.5–6.9 *including* the voice load) plus 2–5 s of
+playback, i.e. **15–25 s per answer**. Speak the reply *after* the text is on
+screen, on a worker thread, and let a press/tap cancel it — nobody waits 20 s
+with a frozen UI. `low` is the lever if that is too slow; `medium` is what the
+bench has.
+
 Install it offline with a manifest `untar` entry rather than a `files` push —
 SFTP `put` would drop the exec bit and flatten the bundled `.so` symlinks
 (`system.md`, "Installing packages without Wi-Fi").

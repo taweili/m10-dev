@@ -3,6 +3,16 @@
 The skill is installed by symlink, so the version matters: bump the minor
 version for new references or tools, the patch version for corrections.
 
+## 0.8.2 — 2026-10-23
+
+- **Recorded what Piper costs next to Vosk in one process** (`references/speech.md`,
+  "Piper next to Vosk"): the two coexist on the 512 MB board (peak 308 MB used of
+  the 423 MB `free` reports, no OOM), but a "listen, then answer out loud" turn
+  costs 15-25 s — 10-14 s of piper for a 2-4 s utterance (RTF 4.5-6.9 including
+  the ~5 s one-shot voice load) plus playback. The guidance that follows: speak
+  after the text is on screen, on a worker thread, cancellable. Measured while
+  adding voice-out to `gbuddy.py` on the bench.
+
 ## 0.8.1 — 2026-10-23
 
 - **Dropped every repo-specific `examples/` reference.** The skill is meant to
