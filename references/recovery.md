@@ -55,6 +55,12 @@ restart lightdm, and relaunch.
 different display, or it drew once and died. Check its stderr
 (`references/paramiko.md`, buffering trap) before blaming X.
 
+**The app crashed and no home menu is running** — on a trimmed board
+(`scripts/m10-trim-services.py`, `system.md`), `pyboardgui` is disabled, so a
+crashed app leaves the panel **black** instead of returning to the home screen.
+Check `pgrep -af '[a]pp.py'`: if nothing is running, the app died — read
+`/tmp/app.err` for the traceback and relaunch.
+
 ## 3. Script recovery
 
 ```bash
@@ -77,16 +83,63 @@ pkill -KILL -f '[a]pp.py'            # only if SIGINT did not work
 
 ## 4. Audio recovery
 
+The M10 has **no onboard speaker** — the only audio output that always works
+is the **buzzer** (piezo, PWM). For real audio you need a USB speaker in the
+USB-A port, but a USB speaker that isn't detected is a hardware problem, not
+a software one. Work down this ladder.
+
+### 4.1 Is the USB speaker detected at all?
+
 ```bash
-aplay -l                             # is the USB speaker enumerated?
-pactl info | head -3                 # PulseAudio alive?
-systemctl restart pulseaudio
-alsactl restore                      # re-apply the saved mixer state
+lsusb                                 # must list the speaker here, not just hubs
+lsusb -t                               # topology — which bus/port
+lsmod | grep snd_usb_audio             # the driver loads on detection
+aplay -l                               # a new ALSA card appears (e.g. card 2)
 ```
 
-No speaker in `aplay -l` → reseat the USB-A speaker; the M10 has **no onboard
-speaker**. Mic silent → `m10-api.md` §5 (Loopback trap,
-capture gain, `hw:1,0`).
+The USB-A port maps to **Bus 02** (EHCI, `ff440000.usb`) and **Bus 03**
+(OHCI, `ff450000.usb`); the USB-C gadget link is Bus 01 (DWC OTG,
+`ff400000.usb`). If `lsusb` shows only `Linux Foundation … root hub` on all
+three buses, the speaker is not being electrically seen — no amount of
+software will fix that.
+
+| Symptom | Cause / fix |
+|---|---|
+| Speaker not in `lsusb` at all | reseat in the USB-A port; try a **powered USB hub** (the M10's port may not supply enough current); try a **data-capable** cable (some ship charge-only); test the speaker on a PC |
+| Speaker in `lsusb` but no ALSA card | `modprobe snd-usb-audio`; if it fails with `Exec format error` the module is built for a different kernel — reflash is the only fix |
+| `snd-usb-audio` not in `lsmod` | the module is available at `/lib/modules/…/kernel/sound/usb/snd-usb-audio.ko` but only loads when a device appears — detection failed (see above) |
+| Works on a hub, not alone | the port's current limit — use a powered hub permanently |
+
+### 4.2 PulseAudio
+
+```bash
+pactl info | head -3                   # PulseAudio alive?
+systemctl restart pulseaudio           # if it's a managed service
+pulseaudio --start                     # if the service is masked (trimmed bench)
+pactl list short sinks                 # the USB speaker appears as a sink
+pactl set-default-sink <sink-name>     # route Audio.play() to it
+alsactl restore                        # re-apply the saved mixer state
+```
+
+On a trimmed bench (`m10-trim-services.py`), the `pulseaudio.service` unit is
+masked, so `systemctl restart` fails with "Unit file does not exist". Start
+the daemon directly with `pulseaudio --start` for ad-hoc testing; it runs as a
+user daemon under `/run/user/0/pulse/`.
+
+### 4.3 The silent-success trap
+
+`aplay`, `paplay` and `unihiker.Audio.play()` all **return exit 0** even when
+there is no speaker wired to the DAC. The onboard codec (`card 1`,
+`rk3308-acodec`) has no physical output — audio routed there goes nowhere
+audible. If playback "succeeds" but you hear nothing:
+
+1. Check `pactl list short sinks` — if only `alsa_output.platform-acodec-sound`
+   is listed, the USB speaker is not a sink (not detected, §4.1).
+2. Confirm the buzzer works (it always does): `python3 -c "from
+   pinpong.board import Board; Board().begin(); from
+   pinpong.extension.unihiker import buzzer; buzzer.pitch(880)"`.
+
+Mic silent → `m10-api.md` §5 (Loopback trap, capture gain, `hw:1,0`).
 
 ## 5. Reboot — do it properly
 
@@ -131,9 +184,10 @@ This is the point where recovery stops: reflash (`flash-firmware.md`). It wipes
 |---|---|
 | No ping / no SSH | `board-link.md` — NIC/NM/route, then replug |
 | SSH, no X | `systemctl restart lightdm` |
+| App crashed, panel black | trimmed board → no home menu; read `/tmp/app.err` |
 | Screen blank after idle | `xset s off -dpms` |
 | Wrong orientation / clipped | re-apply `Rotate`, restart lightdm |
 | App hung / duplicated | `pkill` bracket trick, relaunch one |
 | Buzzer/GPIO wedged | kill, then reboot if it persists |
-| Audio gone | `aplay -l`, `systemctl restart pulseaudio`, `alsactl restore` |
+| Audio gone | §4 — `lsusb` first (is the speaker seen?), then PulseAudio, then the silent-success trap |
 | Filesystem errors / boot loop | reflash (`flash-firmware.md`) |

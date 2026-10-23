@@ -23,6 +23,12 @@
 #   scripts/m10-clash-exclude.sh            apply the exclusion (idempotent)
 #   scripts/m10-clash-exclude.sh --status   report only, change nothing
 #
+# HOST CONFIG CHANGE. Applying it edits Clash Verge's Merge.yaml (backed up
+# first) and asks you to re-apply the profile in the GUI. Do it only with the
+# user's explicit approval for that command; --status is read-only and always
+# safe. See references/board-link.md ("Host network changes need explicit
+# approval").
+#
 set -uo pipefail
 
 BOARD="10.1.2.3"
@@ -34,7 +40,7 @@ DO_STATUS=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --status) DO_STATUS=1 ;;
-    -h|--help) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,31p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
   shift

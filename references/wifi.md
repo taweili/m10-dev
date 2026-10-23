@@ -132,4 +132,4 @@ nmcli connection add type wifi con-name "M10 Hotspot" ifname p2p0 \
 | IP but no internet | `cat /etc/resolv.conf`; suspect router client-isolation on guest SSIDs. |
 | "Device or resource busy" | `sudo fuser -v /sys/class/net/wlan0`; `sudo pkill wpa_supplicant; sudo systemctl restart NetworkManager`. |
 | `nmcli con up wifi` hangs | Expected — the factory `wifi` profile points at the invisible `ssid=test`. Create a real connection; optionally `nmcli con del wifi`. |
-| USB link drops after joining Wi-Fi | Shouldn't happen; if it does, re-run `scripts/m10-net-setup.sh` (`board-link.md`). |
+| USB link drops after joining Wi-Fi | Shouldn't happen; if it does, re-run `scripts/m10-net-setup.sh` (`board-link.md`) — host network change, so with the user's approval. |

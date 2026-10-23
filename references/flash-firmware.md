@@ -240,7 +240,7 @@ tr '\r' '\n' < /tmp/m10-burn.log | grep -oE '\([0-9]+%\)' | tr -d '()%' | sort -
    on its own after `rd`; power-cycling or unplugging mid-install means reflashing
    from scratch. Wait for the language-selection screen.
 5. **Don't skip `firstRun.sh`.** It burns the GD32 coprocessor firmware; if it
-   doesn't run, every `pinpong` call silently no-ops (`SKILL.md` non-negotiable 1).
+   doesn't run, every `pinpong` call silently no-ops (`SKILL.md` non-negotiable 2).
 6. **Failed `wl` is not fatal** — maskrom is always re-enterable. If it dies at
    the *same* byte every time, suspect the eMMC rather than the cable.
 
@@ -255,7 +255,8 @@ The board comes back at portrait, offline, and empty. Work through this in order
 3. **Let `firstRun.sh` finish** (GD32 burn). Don't pre-seed `/etc/machine-id`.
 4. **Restore the USB link** — a flash resets the NM profile to
    `ipv4.method=link-local`, so the board shows up at `169.254.x.x` under a
-   **new interface name**. Run `scripts/m10-net-setup.sh`
+   **new interface name**. Run `scripts/m10-net-setup.sh` (host network change —
+   with the user's approval; `--status` first, it is read-only)
    (`board-link.md`); do not hand-add the address.
 5. **Rejoin Wi-Fi** — profiles were wiped (`wifi.md`).
 6. **Re-apply landscape** if you want it — `m10-api.md` §7. Check with
@@ -306,7 +307,7 @@ the board is in portrait: `GUI(w=320, h=240)` on a 240-wide screen.
 | Board dark after `rd` | write was interrupted; re-enter maskrom and re-flash |
 | Boots but touch is offset | touch not calibrated — long-press Home → Calibrate |
 | Boots, but pinpong does nothing | `firstRun.sh` (GD32 burn) never ran |
-| `169.254.x.x`, board unreachable | NM profile left at link-local → `scripts/m10-net-setup.sh` |
+| `169.254.x.x`, board unreachable | NM profile left at link-local → `scripts/m10-net-setup.sh` (host change — ask first) |
 | Text/UI clipped on the right | board is portrait; re-apply `Rotate` (`m10-api.md` §7) |
 | `apt-get update` DNS failures | no internet — join Wi-Fi first; sources are already correct on v0.4.1+ |
 

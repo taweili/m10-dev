@@ -134,22 +134,31 @@ scripts/m10-offline-install.py --manifest offline/manifest.json
 ```
 
 A manifest (`version: 1`, paths relative to the file) declares: `board_dirs`,
-`files` and `trees` to push, `debs` to extract (not install), `pip` packages
-to install with `--no-index --find-links`, `checks` modules to import, an `abi`
-`LD_PRELOAD` load test, and `pycompile` dirs. Unknown keys are rejected, and
-local paths may not escape the manifest directory.
+`files` and `trees` to push, `untar` archives to extract on the board, `debs`
+to extract (not install), `pip` packages to install with
+`--no-index --find-links`, `checks` modules to import, an `abi` `LD_PRELOAD`
+load test, and `pycompile` dirs. Unknown keys are rejected, and local paths may
+not escape the manifest directory.
 
 ```json
 {
   "version": 1,
   "board_dirs": ["/tmp/offline/wheels"],
   "files": [{"src": "wheels/foo-1.0-...whl", "dst": "/tmp/offline/wheels/"}],
+  "untar": [{"src": "bins/piper_arm64.tar.gz", "dst": "/root/speech-models"}],
   "debs": [{"src": "debs/libstdc++6_...deb", "extract": "/root/speech-models/extracted_libstdc++"}],
   "pip": {"find_links": "/tmp/offline/wheels", "packages": ["foo"], "no_deps": true},
   "checks": ["foo"],
   "pycompile": ["/root/g-buddy"]
 }
 ```
+
+**`untar` is for prebuilt ARM binaries** (Piper is the example, `speech.md`).
+SFTP `put` creates plain 0644 files and follows symlinks, which breaks an
+executable bundle — `untar` ships the upstream `.tar.gz` and extracts it on the
+board, keeping exec bits, symlinks and its internal layout. Both `untar` and
+`debs` stage the archive under `/tmp/offline/` first (the manifest's paths are
+*local*, so they are meaningless on the board).
 
 `templates/offline-manifest.example.json` is a complete example. `no_deps` is
 explicit on purpose — `--no-deps` silently installs broken wheels, so the
@@ -192,7 +201,7 @@ sudo systemctl disable --now pyboardgui          # web pyboard UI   ~54 MB
 sudo systemctl disable --now smbd nmbd           # SMB              ~25 MB
 sudo systemctl disable --now xrdp xrdp-sesman    # remote desktop    ~8 MB
 sudo systemctl disable --now x0vncserver         # VNC               ~3 MB
-sudo systemctl disable --now bluetooth           # BT                ~3 MB
+sudo systemctl disable --now bluetooth           # BT                ~3 MB   (re-enable for an A2DP speaker → references/bluetooth.md)
 sudo systemctl disable --now dhclient-wlan0      # Wi-Fi DHCP        ~4 MB
 sudo systemctl disable --now exim4               # MTA               ~2 MB
 sudo systemctl disable --now cron                # cron              ~1 MB
@@ -220,7 +229,8 @@ skill script `scripts/m10-trim-services.py` handles that case.
 
 **Do NOT disable:** `Xorg`, `PulseAudio` (the `unihiker` **`Audio` API** needs it
 — but **only** that; a script that records/plays via `pyaudio`/`arecord` on the
-ALSA device directly, like `examples/03`, does **not** need pulse), `lightdm`,
+ALSA device directly, like `examples/03`, does **not** need pulse; a **Bluetooth
+A2DP speaker** also needs pulse — see `references/bluetooth.md`), `lightdm`,
 `NetworkManager`, `sshd`, `systemd-*`, `isc-dhcp-server` (the board's own DHCP
 for the USB link in `--dhcp` mode), `unclutter` (hides the cursor for touch).
 `wpa_supplicant` must come back if you want Wi-Fi.

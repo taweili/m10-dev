@@ -165,7 +165,14 @@ Verified acoustically: sounding the buzzer lifts capture from −50.7 to
 −28.0 dBFS.
 
 **There is no onboard speaker** — `audio.play()` needs a USB speaker in the
-USB-A port. The buzzer is separate and always works.
+USB-A port, **or a paired Bluetooth A2DP speaker** (`references/bluetooth.md`).
+The buzzer is separate and always works.
+
+> **USB speaker not detected?** That is a hardware issue, not software —
+> see `recovery.md` §4 for the full ladder (lsusb → modprobe → PulseAudio →
+> the silent-success trap). The USB-A port maps to Bus 02 (EHCI) / Bus 03
+> (OHCI); the USB-C gadget is Bus 01. If `lsusb` shows only root hubs, the
+> speaker is not electrically connected.
 
 **Audio plumbing (host-side checks, run on the board):**
 
@@ -391,11 +398,7 @@ while True:
         bg.config(image=Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)))
 ```
 
-**Bluetooth** — the on-board RTL8723DS does Classic RFCOMM (`bluetooth`
-module, enable with `hciconfig hci0 piscan`, server `BluetoothSocket(RFCOMM)`
-on port 1, client `connect(("MAC", 1))`). **BLE is not the same thing** and the
-stock API set does not cover it properly; the wiki's BLE examples use the
-DFRobot BLELink accessory. Linux BlueZ (`bleak`, `bluepy`) is the honest path.
+**Bluetooth** — the on-board RTL8723DS does **both Classic RFCOMM (data) and A2DP (audio to a speaker)** on this image. RFCOMM: `bluetooth` module, enable with `hciconfig hci0 piscan`, server `BluetoothSocket(RFCOMM)` on port 1, client `connect(("MAC", 1))`. A2DP speaker pairing needs PulseAudio un-masked (the default bench trim masks it) → `references/bluetooth.md` for the full scan/pair/connect + audio-routing walk-through, red lines, and the `org.bluez.Error.Failed` fix. **BLE is not the same thing** and the stock API set does not cover it properly; the wiki's BLE examples use the DFRobot BLELink accessory. Linux BlueZ (`bleak`, `bluepy`) is the honest path.
 
 **UART / I²C / SPI** — plain Debian devices plus `pinpong.libs.{Uart,I2c,Spi}`;
 overlays are already in `/boot/uEnv.txt` (`uart0`, `i2c1`, `i2c2`, `uart3`,

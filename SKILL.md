@@ -1,6 +1,6 @@
 ---
 name: m10-dev
-description: "Develop and deploy Python for the DFRobot UNIHIKER M10 (RK3308, Debian 10 SBC) over USB-C: reach and repair 10.1.2.3, Wi-Fi, paramiko SSH/SFTP, deploy and background-run scripts, framebuffer screenshots, unihiker GUI/animation, pinpong GPIO/sensors/buttons/buzzer/LED, touch, mic/audio, landscape, packages/services, offline and cloud STT/TTS, and rkdeveloptool firmware flashing. Triggers: UNIHIKER, M10, K10, pinpong, unihiker, dfrobot, 10.1.2.3, \"the board\", board deploy, framebuffer, touchscreen, Vosk, Azure Speech, reflash, rkdeveloptool, maskrom."
+description: "Develop and deploy Python for the DFRobot UNIHIKER M10 (RK3308, Debian 10 SBC) over USB-C: reach and repair 10.1.2.3, Wi-Fi, paramiko SSH/SFTP, deploy and background-run scripts, framebuffer screenshots, unihiker GUI/animation, pinpong GPIO/sensors/buttons/buzzer/LED, touch, mic/audio, landscape, packages/services, offline and cloud STT/TTS, and rkdeveloptool firmware flashing. Triggers: UNIHIKER, M10, K10, pinpong, unihiker, dfrobot, 10.1.2.3, \"the board\", board deploy, framebuffer, touchscreen, Vosk, Azure Speech, reflash, rkdeveloptool, maskrom, bluetooth speaker, A2DP, bluetoothctl."
 ---
 
 # M10 dev
@@ -47,6 +47,7 @@ Read the reference that matches the task; each is self-contained.
 | Prove a GUI rendered, from `/dev/fb0` | `references/verify-gui.md` |
 | **X/app/audio wedged, board unresponsive, how to reboot** | `references/recovery.md` |
 | **Flash/reflash firmware** from Linux with `rkdeveloptool` — destructive, read first | `references/flash-firmware.md` |
+| Pair a Bluetooth A2DP speaker / Classic RFCOMM; the PulseAudio un-mask A2DP needs | `references/bluetooth.md` |
 | Decode the jargon (`br0`, RNDIS, NS2009, tslib, maskrom, …) | `references/glossary.md` |
 
 ## Triage: it's broken, where do I look?
@@ -61,16 +62,22 @@ Read the reference that matches the task; each is self-contained.
 | `pinpong` calls silently do nothing | `Board().begin()` missing, or GD32 never burned (`system.md`) |
 | Touch lands in the wrong place | no `/etc/pointercal` — fit one (`m10-api.md` §9) |
 | Mic silent / picks the wrong device | `m10-api.md` §5 — skip `Loopback`, use `hw:1,0` |
-| No sound | no onboard speaker; USB speaker + `pulseaudio` (`recovery.md` §4) |
+| No sound / USB speaker silent | `recovery.md` §4 — `lsusb` first (is it detected?), then PulseAudio, then the silent-success trap (`recovery.md` §4) |
 | `apt` 404s | Debian 10 EOL → archive sources (`system.md`) |
 | Board boots but is empty / portrait / offline | that is a fresh flash — post-flash checklist (`flash-firmware.md`) |
 | Anything else | `scripts/m10-smoke.py` first, then the table in `health-check.md` |
 
 ## Red lines
 
-These need an explicit **yes** from the user; they destroy state or hide the
-evidence:
+These need an explicit **yes** from the user; they destroy state, change the
+**host machine**, or hide the evidence:
 
+- **Changing the host PC's network state** — addresses, routes, links, DNS,
+  interfaces, NetworkManager profiles, VPN/TUN config. This is a hard stop:
+  get approval for **each specific command**, and never infer it from approval
+  of a previous one. `pkexec`/`sudo` is not itself permission. Read-only
+  diagnosis (`--status`, `ip addr show`, `ip route get`, `ip neigh`, `ping`,
+  `lsusb`) is always fine. `board-link.md` §"Host network changes".
 - **Reflashing the board** — wipes `/root/`, Wi-Fi profiles, landscape config.
   `flash-firmware.md`.
 - **`apt upgrade`** — the image already has Buster's EOL patches; a blanket
@@ -79,42 +86,50 @@ evidence:
   request, and prefer SIGINT (releases GPIO/framebuffer).
 - **Pulling power** instead of `poweroff`/`reboot` — corrupts the eMMC.
 - **`ip addr add` for the USB link** — works until re-enumeration, then hides the
-  failure. Use the NetworkManager profile.
+  failure. Use the NetworkManager profile; the only exception is an on-demand
+  bench with NetworkManager inactive (`board-link.md`) — and even then it is a
+  **host network change**, so ask first.
 - **`pkill -f 'app.py'`** without the bracket trick (`'[a]pp.py'`) — matches the
   killing shell itself.
 
 ## Non-negotiables
 
-1. **`Board().begin()` before any pinpong object.** Otherwise `button_a`,
+1. **Never touch the host PC's network without explicit, per-command
+   approval.** Drivers, addresses, routes, NM profiles, VPN exclusions — all of
+   it. Diagnose read-only and present the exact command; the user runs it or
+   says yes. The board's own config over SSH is *not* covered by this rule (it
+   is the normal workflow; it has its own red lines above) →
+   `references/board-link.md`.
+2. **`Board().begin()` before any pinpong object.** Otherwise `button_a`,
    `buzzer`, `light`, … exist as globals but every call no-ops or raises.
-2. **Never fix the USB link with `ip addr add`.** It silently disappears when
-   the gadget re-enumerates → `references/board-link.md`.
-3. **Launch GUI/`while True:` scripts in the background** with `DISPLAY=:0`.
+3. **Don't fix the USB link with `ip addr add`.** It silently disappears when
+   the gadget re-enumerates → `references/board-link.md`. The one exception is
+   an on-demand bench with NetworkManager inactive.
+4. **Launch GUI/`while True:` scripts in the background** with `DISPLAY=:0`.
    A foreground `exec_command` blocks until timeout (`PipeTimeout`) →
    `references/paramiko.md`.
-4. **`buzzer.pitch(freq, beat)` takes an integer beat count, not milliseconds,
+5. **`buzzer.pitch(freq, beat)` takes an integer beat count, not milliseconds,
    and blocks** while it sounds. Use `buzzer.pitch(freq)` for a non-blocking
    tone → `references/m10-api.md`.
-5. **`fill_rect` has no radius.** Use `fill_round_rect(...)`, which does take
+6. **`fill_rect` has no radius.** Use `fill_round_rect(...)`, which does take
    `r=`, for anything round; `fill_circle` takes its x,y as the **centre** →
    `references/gui-drawing.md`.
-6. **`apt` is broken on this image** (Debian 10 EOL, 404s). Repoint to
+7. **`apt` is broken on this image** (Debian 10 EOL, 404s). Repoint to
    `archive.debian.org` before installing anything → `references/system.md`.
-7. **No onboard speaker, but there *is* an onboard mic.** Skip ALSA devices
+8. **No onboard speaker, but there *is* an onboard mic.** Skip ALSA devices
    named `Loopback` → `references/m10-api.md`.
-8. **PIL 9.0.1 here cannot decode RGB565.** Decode `/dev/fb0` by hand →
+9. **PIL 9.0.1 here cannot decode RGB565.** Decode `/dev/fb0` by hand →
    `references/verify-gui.md`.
-9. **Vosk (and only Vosk) needs the Debian 11 `libstdc++` preload** →
+10. **Vosk (and only Vosk) needs the Debian 11 `libstdc++` preload** →
    `references/speech.md`.
-10. **A flash is a reimage, not an upgrade.** It wipes `/root/`, the Wi-Fi
+11. **A flash is a reimage, not an upgrade.** It wipes `/root/`, the Wi-Fi
     profiles, and the landscape `Rotate` config (the board returns portrait
     240×320), so back up — and re-apply landscape — every time →
     `references/flash-firmware.md`.
-11. **Touch arrives as raw, uncalibrated 12-bit ADC.** There is no
+12. **Touch arrives as raw, uncalibrated 12-bit ADC.** There is no
     `/etc/pointercal` on the image, so the X/tslib path is dead until you fit
     one; evdev + your own affine works out of the box →
     `references/m10-api.md` §9.
-
 ## Conventions
 
 - **`python3 -m py_compile` before an SSH round trip** catches a syntax error
@@ -166,8 +181,8 @@ start with `references/board-link.md`.
 | `scripts/m10-smoke.py` | connectivity, versions, coprocessor, mic, display, snapshot |
 | `scripts/m10-deploy.py` | push + restart one script, check for duplicates, show logs |
 | `scripts/m10-snapshot.py` | RGB565 framebuffer → PNG on the PC (`--rotate`, `--census`) |
-| `scripts/m10-net-setup.sh` | durable `10.1.2.2/24` on the USB gadget NIC |
-| `scripts/m10-clash-exclude.sh` | keep `10.1.2.0/24` out of a Clash Verge TUN (`--status`) |
+| `scripts/m10-net-setup.sh` | durable `10.1.2.2/24` on the USB gadget NIC. **Host network change — needs explicit approval; `--status` is read-only** |
+| `scripts/m10-clash-exclude.sh` | keep `10.1.2.0/24` out of a Clash Verge TUN. **Host config change — needs explicit approval; `--status` is read-only** |
 | `scripts/m10-trim-services.py` | disable DFRobot's daemons, free ~55 MB |
 | `scripts/m10-offline-install.py` | manifest-driven offline wheels/debs/models + import/ABI checks |
 | `scripts/check-docs.py` | validate this skill's file/section references (dev tool) |

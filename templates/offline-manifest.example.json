@@ -7,6 +7,9 @@
   "trees": [
     {"src": "offline/models/example-model", "dst": "/root/speech-models/example-model"}
   ],
+  "untar": [
+    {"src": "offline/bins/example_arm64.tar.gz", "dst": "/root/speech-models"}
+  ],
   "debs": [
     {"src": "offline/debs/example.deb", "extract": "/tmp/offline/example"}
   ],

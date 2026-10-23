@@ -42,6 +42,10 @@ Cloud integration: `azure-speech.md`.
 | OpenAI TTS | cloud | ✅ | minimal | Excellent |
 | ElevenLabs | cloud | ❌ 3.8+ (use REST) | — | Best |
 
+> **Measured on this board:** Piper `medium` is ~8 s per short sentence
+> (voice load dominates). Plan UI latency for seconds, not milliseconds —
+> see the Piper section below.
+
 `pip install piper-tts` **will not install on Python 3.7** — use the ARM64 C++
 binary via `subprocess`, or sherpa-onnx if you want a Python API.
 
@@ -163,6 +167,38 @@ subprocess.run(["piper", "--model", "en_US-amy-medium.onnx",
                 "--output_file", "/tmp/out.wav"], input=b"Hello from the M10", check=True)
 from unihiker import Audio; Audio().play("/tmp/out.wav")
 ```
+
+**Verified on this board (v1.2.0 bundle, 2026-10):**
+
+| | |
+|---|---|
+| Bundle | `piper_arm64.tar.gz` = `piper` + `libespeak-ng.so.1`, `libonnxruntime.so.1.14.1`, `libpiper_phonemize.so`, `espeak-ng-data/` (~48 MB) |
+| Linking | `RUNPATH=$ORIGIN` — the bundled `.so`s are found next to the binary, nothing goes in `/usr/lib` |
+| **No `LD_PRELOAD` needed** | needs `GLIBC_2.25` + `GLIBCXX_3.4.21`; buster has glibc 2.28 / libstdc++ 3.4.25. Unlike Vosk, Piper needs no Debian-11 `libstdc++` |
+| Text input | **stdin** in v1.2.0 (`echo text \| piper ...`); the positional `-- "text"` form only exists from piper1-gpl 1.3.0 |
+| Phonemizer data | pass `--espeak_data <bundle>/espeak-ng-data` so it does not depend on cwd |
+| Output | `medium`/`high` = 22.05 kHz mono 16-bit; `low` = 16 kHz |
+| Speed | **measured on the RK3308 bench:** voice load **4.2–5.8 s per invocation** (the CLI is one-shot — it reloads the model every call) + inference at **RTF ≈ 1.97**, i.e. ~2x *slower* than real time; "Hello world!" is ~8 s end to end. A Pi 4 manages 0.1–0.5 RTF — the A35 cores are the difference. Use `low` (16 kHz, ~20 MB) when latency matters, `medium` for quality; `high` is pointless here |
+
+**Upstream moved:** `rhasspy/piper` is archived; development is
+`OHF-Voice/piper1-gpl`, **GPLv3 from v1.3.0** (the v1.2.0 binary above is still
+MIT). The `piper-tts` wheel is now 3.9+, so on Py 3.7 the binary is the only
+route.
+
+Install it offline with a manifest `untar` entry rather than a `files` push —
+SFTP `put` would drop the exec bit and flatten the bundled `.so` symlinks
+(`system.md`, "Installing packages without Wi-Fi").
+
+Playback is a separate choice, and it follows the speaker rather than the TTS:
+
+| Output | Call | Why |
+|---|---|---|
+| Bluetooth A2DP | `paplay out.wav` | the sink is `bluez_sink.<MAC>.a2dp_sink` — **Pulse-only**, invisible to ALSA (`bluetooth.md` §2) |
+| USB speaker | `aplay -q -D hw:N,0 out.wav` | a real ALSA card; Pulse may be masked |
+| anything, Pulse up | `unihiker.Audio().play(...)` | Pulse client, so it follows the default sink |
+
+Worked example: `examples/08_hello_world_tts.py` (paplay when `pactl` answers,
+`aplay` otherwise, `--device` to force a card).
 
 **Flite** (English, native **16 kHz** output — matches the mic):
 

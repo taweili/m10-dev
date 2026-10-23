@@ -35,9 +35,20 @@ def record(status, label, detail=""):
     print("%-4s  %-28s %s" % (status, label, detail))
 
 
-def run(c, cmd, t=20):
-    _, so, se = c.exec_command(cmd, timeout=t)
-    return (so.read() + se.read()).decode(errors="replace").strip()
+def run(c, cmd, t=45):
+    """Run a shell command on the board, capturing stdout+stderr.
+
+    Default bumped 20s -> 45s: cold-boot `pip3 show` is the classic slow call
+    and used to blow the channel timeout, killing the whole smoke run with a
+    PipeTimeout traceback. OSError covers socket.timeout (which is what
+    PipeTimeout re-raises as); swallowing it lets one hung command degrade to
+    a WARN/FAIL on its own check instead of aborting the script.
+    """
+    try:
+        _, so, se = c.exec_command(cmd, timeout=t)
+        return (so.read() + se.read()).decode(errors="replace").strip()
+    except (OSError, paramiko.ssh_exception.SSHException):
+        return ""
 
 
 def check_versions(c):
@@ -92,7 +103,7 @@ def check_coprocessor(c):
         "from pinpong.extension.unihiker import light, button_a\n"
         "print('light=%s button_a=%s' % (light.read(), button_a.value()))\n"
     )
-    out = run(c, "python3 -c \"%s\"" % code.replace('"', '\\"'), 30)
+    out = run(c, "python3 -c \"%s\"" % code.replace('"', '\\"'), 45)
     if "light=" in out:
         detail = [ln for ln in out.splitlines() if "light=" in ln][-1]
         record("PASS", "coprocessor (GD32)", detail)
@@ -105,7 +116,7 @@ def check_mic(c):
     code = ("from unihiker import Audio\n"
             "a = Audio()\n"
             "print('dBFS=%.1f level=%s' % (a.sound_dBFS(), a.sound_level()))\n")
-    out = run(c, "python3 -c \"%s\"" % code.replace('"', '\\"'), 25)
+    out = run(c, "python3 -c \"%s\"" % code.replace('"', '\\"'), 45)
     if "dBFS=" in out:
         detail = [ln for ln in out.splitlines() if "dBFS=" in ln][-1]
         # noise floor on this board is about -51 dBFS

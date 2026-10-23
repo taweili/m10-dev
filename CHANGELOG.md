@@ -3,6 +3,96 @@
 The skill is installed by symlink, so the version matters: bump the minor
 version for new references or tools, the patch version for corrections.
 
+## 0.8.0 — 2026-10-23
+
+- **New hard rule: never change the host PC's network without explicit,
+  per-command approval.** Written up in three places so it is met before the
+  command, not after: `SKILL.md` red lines (new first bullet) and
+  non-negotiable 1, `board-link.md` §"Host network changes need explicit
+  approval" (what counts — addresses, routes, links, DNS, NM profiles, driver
+  rebinds/`modprobe -r`, `rfkill`, VPN/TUN config — what is safe read-only, and
+  that a re-enumeration means asking again rather than re-running), plus a
+  header warning in `m10-net-setup.sh` and `m10-clash-exclude.sh`. Every
+  call site that said "just run `m10-net-setup.sh`" now says ask first.
+  Triggered by a `pkexec ip addr add` that was run on the strength of a
+  general "use pkexec".
+- **`m10-offline-install.py`: new `untar` manifest key** — pushes a `.tar.gz`
+  and extracts it on the board, so a prebuilt ARM bundle keeps its exec bits,
+  symlinks and internal layout (SFTP `put` gives 0644 and follows symlinks,
+  which quietly breaks Piper). Also fixed `debs`: it was handing the manifest's
+  *local* path to `dpkg-deb` on the board; the `.deb` is now staged under
+  `/tmp/offline/debs/` first. Documented in `system.md`.
+- **`speech.md`: Piper section rewritten from measured facts.** v1.2.0 bundle
+  needs no `libstdc++` preload (`GLIBC_2.25`/`GLIBCXX_3.4.21` vs buster's
+  2.28/3.4.25) and finds its bundled `.so`s via `RUNPATH=$ORIGIN`; text goes on
+  **stdin** (positional text is 1.3.0+); `--espeak_data` should be explicit.
+  Speed is **not** what the Pi 4 numbers suggest: on the RK3308 the voice loads
+  in 4.2–5.8 s per invocation and inference runs at RTF ≈ 1.97, so a short
+  sentence is ~8 s. Added a playback-by-output-device table (A2DP `paplay`,
+  USB `aplay -D hw:N,0`, `unihiker.Audio()` when Pulse is the right layer).
+- **`bluetooth.md`: "connected but no sink".** `bluetoothctl` can report
+  `Connected: yes` while `pactl` has no `bluez_sink` and has fallen back to the
+  silent `acodec` card; cycling disconnect/connect **with Pulse running** makes
+  `module-bluez5-device` recreate the card (the card index changes — that is
+  the proof). Recorded as a new gotcha.
+- **`m10-smoke.py`: timeouts.** Default `run()` 20 s → 45 s (a cold-boot
+  `pip3 show` blew the channel timeout and killed the whole run with a
+  `PipeTimeout` traceback), and `OSError`/`SSHException` now degrade to a
+  `WARN`/`FAIL` on that one check instead of aborting the script.
+
+## 0.7.2 — 2026-10-23
+
+- **`recovery.md` §4 (Audio recovery) rewritten.** The old section was four
+  lines (`aplay -l`, `pactl info`, `systemctl restart pulseaudio`,
+  `alsactl restore`) and a single "reseat the speaker" sentence. It missed
+  every failure mode we actually hit while trying to use a USB speaker:
+  - **§4.1 Is the USB speaker detected at all?** — the critical first step:
+    `lsusb` must list the speaker, not just root hubs. Documents the USB-A
+    port → bus mapping (Bus 02 EHCI / Bus 03 OHCI; USB-C gadget is Bus 01),
+    the `snd-usb-audio` module load failure (`Exec format error` → reflash),
+    and the powered-hub / data-cable / current-limit causes.
+  - **§4.2 PulseAudio** — on a trimmed bench the `pulseaudio.service` unit is
+    masked, so `systemctl restart` fails with "Unit file does not exist".
+    Documents `pulseaudio --start` as the ad-hoc workaround (runs as a user
+    daemon under `/run/user/0/pulse/`).
+  - **§4.3 The silent-success trap** — `aplay`/`paplay`/`Audio.play()` all
+    return exit 0 even when no speaker is wired to the DAC. The onboard codec
+    (`card 1`, `rk3308-acodec`) has no physical output, so audio routed there
+    goes nowhere audible. Documents how to tell a real sink from the codec
+    and confirms the buzzer as the always-works fallback.
+  - Escalation table row updated from "aplay -l, restart pulseaudio" to the
+    new three-step ladder.
+
+- **`m10-api.md` §5**: added a callout pointing to `recovery.md` §4 for USB
+  speaker detection issues, with the USB-A port → bus mapping inline.
+
+- **`SKILL.md` triage**: the "No sound" row now points to the §4 ladder
+  instead of the old one-liner.
+
+## 0.7.1 — 2026-10-23
+
+- **`recovery.md` §2**: added the "app crashed + home menu disabled" case.
+  When a trimmed board (`scripts/m10-trim-services.py`) has no `pyboardgui`
+  running, a crashed app leaves the panel black instead of returning to the
+  home screen. Previously undocumented — the recovery ladder assumed the home
+  menu was always present. Added to the escalation table as well.
+
+- **`board-link.md`**: new "Exception: on-demand boards, NetworkManager
+  inactive" subsection. The "Do not use `ip addr add`" rule assumed NM was
+  running; on a bench where the board is plugged in only when needed and NM is
+  disabled, a per-session `ip addr add` is the only pragmatic option. The
+  reference now documents the exception, points to
+  `scripts/m10-net-setup.sh --status` (which detects the NIC via sysfs and
+  works without NM), and adds a failure-mode row.
+
+- **`SKILL.md` red line**: softened the absolute "never `ip addr add`" to
+  acknowledge the on-demand exception, with a cross-reference to
+  `board-link.md`.
+
+- **AGENTS.md**: removed the generic content that moved to the skill (black
+  screen consequence, `ip addr add` rationale); kept only instance-specific
+  facts.
+
 ## 0.7.0 — 2026-10-20
 
 - **`references/azure-speech.md` rewritten for the M10's real constraints.**

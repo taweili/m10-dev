@@ -13,6 +13,34 @@ sits at a fixed `10.1.2.3/24` on its `br0` bridge, so the PC needs an address in
 | PC side address | `10.1.2.2/24` (static, recommended) |
 | Board side | `10.1.2.3/24`, SSH on 22, web UI on 80, Jupyter on 8888 |
 
+## Host network changes need explicit approval
+
+The fixes in this file change **the PC you are working on**, not the board,
+and sit behind a hard rule (`SKILL.md` red lines, non-negotiable 1):
+
+- **Never run** an address/route/link change, an NM profile change, a driver
+  rebind or module unload, `rfkill`, a DNS edit, or a VPN/TUN config edit
+  without an explicit **yes for that exact command**. Approval of a previous
+  command — or a general "fix the link" — is **not** approval for the next one.
+  `sudo`/`pkexec` succeeding is not permission either; it is only escalation.
+- **Measurements are not implied by approval.** Re-enumeration wipes a session
+  address, so the *second* run of the same command needs asking again.
+- **Diagnose read-only first, then present one command.** `scripts/m10-net-setup.sh
+  --status`, `ip -br addr`, `ip route get 10.1.2.3`, `ip neigh show dev <nic>`,
+  `ping`, `lsusb`, `lsusb -t`, `/sys/class/net/*/…` reads, and `dmesg` are all
+  safe and answer most questions without touching anything.
+- **Host-side things that count as network changes** (all seen on real
+  benches): `ip addr add|del`, `ip route`, `ip link set`, `nmcli con …`,
+  `systemctl restart NetworkManager`, `modprobe -r <usbnet driver>`,
+  `/sys/bus/usb/drivers/<drv>/{bind,unbind}`, `rfkill unblock`, edits to
+  `/etc/network/`, `/etc/NetworkManager/`, `/etc/resolv.conf`, and applying a
+  TUN/proxy exclusion (`m10-clash-exclude.sh` **without** `--status`).
+- **Not covered by this rule:** anything changed *on the board* over SSH. That
+  is the normal workflow and has its own red lines (reflash, `apt upgrade`,
+  killing an app).
+
+State the command, what it changes, and why — then wait.
+
 ## Do not use `ip addr add`
 
 ```bash
@@ -26,6 +54,23 @@ gone. If the stored NetworkManager profile for that NIC is `Link-Local Only`, NM
 comes back with `169.254.x.x`, there is no route to `10.1.2.0/24`, and the board
 is dark.
 
+### Exception: on-demand boards, NetworkManager inactive
+
+The rule above assumes NetworkManager is running and the board is permanently
+connected. On a bench where the board is plugged in only when needed and
+NetworkManager is disabled (or absent), `nmcli` cannot create a profile and a
+`.network` unit is the wrong shape for a device that isn't always here. In that
+case a per-session
+
+```bash
+sudo ip addr add 10.1.2.2/24 dev <current USB-ethernet NIC>
+```
+
+is the pragmatic fallback. It does not survive re-enumeration — re-run it after
+each plug-in. To find the NIC name (it changes every time: `usb0`, `usb1`,
+…), run `scripts/m10-net-setup.sh --status`, which detects the gadget via sysfs
+(`/sys/class/net/*/device/../uevent`) and works even when NM is inactive.
+
 ## The fix: `m10-net-setup.sh`
 
 Writes the address into the **NetworkManager profile, keyed to the board's MAC**,
@@ -33,7 +78,7 @@ so it survives renaming and re-enumeration. Ships with this skill at
 `scripts/m10-net-setup.sh`.
 
 ```bash
-scripts/m10-net-setup.sh              # static 10.1.2.2/24 (recommended)
+scripts/m10-net-setup.sh              # static 10.1.2.2/24 (recommended; host change — ask first)
 scripts/m10-net-setup.sh --dhcp       # board's isc-dhcp-server → ~10.1.2.101
 scripts/m10-net-setup.sh --status     # diagnose only, changes nothing
 scripts/m10-net-setup.sh --remove     # delete the profile it created
@@ -109,8 +154,8 @@ ssh root@10.1.2.3                          # password: dfrobot
 | No NIC found at all | Board off/booting, or cable in a **hub/dock** — plug it straight into the PC. |
 | `169.254.x.x` only | NM profile is `IPv4 Link-Local Only` → run the script (it sets `manual`). |
 | Board never answers ARP | Board asleep/off, or wrong NIC. Press the Home button; wait ~10 s; re-plug. |
-| `ip route get` says `dev Mihomo` (or another TUN) | A TUN-mode VPN is intercepting → exclude `10.1.2.0/24` in the VPN client, or run `scripts/m10-clash-exclude.sh` (Clash Verge). |
-| Was working, now dark | Gadget re-enumerated → just re-run the script. |
+| `ip route get` says `dev Mihomo` (or another TUN) | A TUN-mode VPN is intercepting → exclude `10.1.2.0/24` in the VPN client. `scripts/m10-clash-exclude.sh --status` diagnoses; *applying* it is a host config change — ask first. |
+| Was working, now dark | Gadget re-enumerated → re-run the script (or re-run `ip addr add` on an on-demand bench). |
 | SSH works, GUI scripts don't show | Set `DISPLAY=:0` when launching over SSH (see `paramiko.md`). |
 
 Once up: `http://10.1.2.3` (local web page), `http://10.1.2.3:8888` (Jupyter,

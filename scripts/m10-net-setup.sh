@@ -17,6 +17,10 @@
 #   ./m10-net-setup.sh --status     diagnose only, change nothing
 #   ./m10-net-setup.sh --remove     delete the profile this script created
 #
+# HOST NETWORK CHANGE. Every mode except --status reconfigures the host PC's
+# networking. Run it only with the user's explicit approval for that command;
+# --status is read-only and always safe. See references/board-link.md.
+#
 # Generic version. A host with extra packaging (e.g. a TUN-mode VPN that
 # captures 10.0.0.0/8) needs an extra route exclusion — see
 # references/board-link.md.
@@ -41,6 +45,10 @@ Usage:
   ./m10-net-setup.sh --status        diagnose only, change nothing
   ./m10-net-setup.sh --remove        delete the created NM profile
   -h, --help                         this text
+
+HOST NETWORK CHANGE. Every mode except --status reconfigures this PC's
+networking. Run it only with the user's explicit approval for that command;
+--status is read-only and always safe (references/board-link.md).
 
 Requires: NetworkManager (nmcli), root or pkexec.
 EOF

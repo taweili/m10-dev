@@ -14,6 +14,8 @@ Manifest: version 1, paths relative to the manifest file.
   board_dirs  remote dirs to create
   files       [{src, dst}]   dst ending in / keeps the basename
   trees       [{src, dst}]   recursive push
+  untar       [{src, dst}]   push a .tar.gz, extract it on the board into dst
+                             (keeps exec bits and symlinks that SFTP put loses)
   debs        [{src, extract}]
   pip         {find_links, packages, no_deps}
   checks      module names to import on the board
@@ -39,7 +41,7 @@ HOST = os.environ.get("M10_HOST", "10.1.2.3")
 USER = os.environ.get("M10_USER", "root")
 PASS = os.environ.get("M10_PASS", "dfrobot")
 
-ALLOWED = {"version", "board_dirs", "files", "trees", "debs", "pip",
+ALLOWED = {"version", "board_dirs", "files", "trees", "untar", "debs", "pip",
            "checks", "abi", "pycompile"}
 MODULE_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.]*$")
 
@@ -88,7 +90,7 @@ def load(path, allow_missing):
     if m.get("version") != 1:
         raise BadManifest("version must be 1")
 
-    out = {"board_dirs": [], "files": [], "trees": [], "debs": [],
+    out = {"board_dirs": [], "files": [], "trees": [], "untar": [], "debs": [],
            "pip": None, "checks": [], "abi": None, "pycompile": []}
 
     for d in m.get("board_dirs", []):
@@ -113,6 +115,15 @@ def load(path, allow_missing):
                                   (entry, item["src"],
                                    "a directory" if os.path.isdir(src) else "a file"))
             out[entry].append({"src": src, "dst": dst})
+
+    for item in m.get("untar", []):
+        if not isinstance(item, dict) or set(item) != {"src", "dst"}:
+            raise BadManifest("untar entries need exactly src and dst")
+        src = resolve_local(base, item["src"])
+        dst = remote_path(item["dst"], "untar.dst")
+        if not allow_missing and not os.path.isfile(src):
+            raise BadManifest("missing local artifact: %s" % item["src"])
+        out["untar"].append({"src": src, "dst": dst})
 
     for item in m.get("debs", []):
         if not isinstance(item, dict) or set(item) != {"src", "extract"}:
@@ -169,8 +180,13 @@ def plan(m):
         count, size = tree_size(it["src"])
         print("  tree         %-60s -> %s  (%d files, %s)" %
               (os.path.basename(it["src"]), it["dst"], count, human(size)))
+    for it in m["untar"]:
+        print("  untar        %-60s -> %s  (%s)" %
+              (os.path.basename(it["src"]), it["dst"],
+               human(os.path.getsize(it["src"])) if os.path.exists(it["src"]) else "?"))
     for it in m["debs"]:
-        print("  deb extract  %-60s -> %s" % (os.path.basename(it["src"]), it["extract"]))
+        print("  deb extract  %-60s -> %s" %
+              (os.path.basename(it["src"]), it["extract"]))
     if m["pip"]:
         print("  pip          %s%s (find-links %s)" %
               (" ".join(m["pip"]["packages"]),
@@ -289,8 +305,24 @@ def main():
             push_tree(sftp, it["src"], it["dst"])
         step(True, "trees", "%d pushed" % len(m["trees"]))
 
+        for it in m["untar"]:
+            tmp = "/tmp/offline/%s" % os.path.basename(it["src"])
+            sftp_mkdir_p(sftp, posixpath.dirname(tmp))
+            push_file(sftp, it["src"], tmp)
+            rc, out = run(c, "mkdir -p %s && tar xzf %s -C %s" %
+                          (it["dst"], tmp, it["dst"]), max(args.timeout, 300))
+            if not step(rc == 0, "untar", "%s -> %s" %
+                        (os.path.basename(it["src"]), it["dst"])):
+                print(out)
+                return 1
+
         for it in m["debs"]:
-            rc, out = run(c, "dpkg-deb -x %s %s" % (it["src"], it["extract"]),
+            # The manifest records LOCAL paths; stage the .deb on the board first
+            # and extract from there (a local path is meaningless remotely).
+            tmp = "/tmp/offline/debs/%s" % os.path.basename(it["src"])
+            sftp_mkdir_p(sftp, posixpath.dirname(tmp))
+            push_file(sftp, it["src"], tmp)
+            rc, out = run(c, "dpkg-deb -x %s %s" % (tmp, it["extract"]),
                           args.timeout)
             if not step(rc == 0, "deb extract", os.path.basename(it["src"])):
                 print(out)
