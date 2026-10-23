@@ -202,7 +202,7 @@ but `arecord -D hw:1,0` refuses anything other than 8 channels
 (`m10-api.md` §5). SDK paths that try to open the "default" device land on
 a channel count the codec rejects. Push-stream + pyaudio sidesteps both
 problems and lets you reuse the recording loop from
-`g-buddy/examples/03_push_to_talk_stt.py` verbatim.
+`templates/push_to_talk.py` verbatim.
 
 **`PushAudioInputStream.write(buffer)` needs raw bytes** — no audio header.
 Replay from a WAV file? Slice off the RIFF header first, or read via

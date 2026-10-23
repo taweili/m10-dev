@@ -3,6 +3,25 @@
 The skill is installed by symlink, so the version matters: bump the minor
 version for new references or tools, the patch version for corrections.
 
+## 0.8.1 — 2026-10-23
+
+- **Dropped every repo-specific `examples/` reference.** The skill is meant to
+  be self-contained board-generic how-to; pointing at the g-buddy repo's demo
+  scripts (`examples/03`, `04`, `05`, `08`) and its `examples/README.md` entangled
+  the two repos. The three `examples/04_push_to_talk_stt.py` references now point
+  at the skill's own `templates/push_to_talk.py` (same mic-thread + queues +
+  `--file` architecture). The two scripts with no template — the touch playground
+  and the TTS hello-world — had their idioms inlined instead: the touch section
+  now describes the `evdev` + Tk shape to copy, and the TTS section states the
+  `pactl`-dispatch idiom directly. Also: `paramiko.md`'s SFTP example uses a
+  generic `app.py`, `system.md` drops the "keep the repo's `examples/` flat"
+  aside, `m10-deploy.py`'s usage line uses `app.py`, and the "Related" sections
+  in `README.md` / `SKILL.md` point at `AGENTS.md` + `gbuddy.py`. DFRobot wiki
+  links, the on-board `/opt/unihiker/examples` directory, the
+  `offline-manifest.example.json` template, and this changelog's own history are
+  untouched. `scripts/check-docs.py` 16 files, 0 errors, 0 warnings; `py_compile`
+  clean on the touched script.
+
 ## 0.8.0 — 2026-10-23
 
 - **New hard rule: never change the host PC's network without explicit,

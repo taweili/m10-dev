@@ -355,10 +355,10 @@ displacement: tap (`<0.35 s`, `<14 px`), long press (`≥0.6 s`, small travel),
 drag, swipe (≥24 px travel, dominant axis). Use the **release** position, not
 the press position, or every swipe measures 0 px.
 
-Worked implementation (evdev reader thread, in-process calibration, 5-point
-tslib-compatible `--calibrate`, hand-rolled canvas buttons, gesture recogniser):
-`examples/05_touch_playground.py` in the `g-buddy` repo (notes in its
-`examples/README.md`). The `unihiker` widgets cover taps only —
+The shape to copy for anything beyond a tap — an evdev reader thread, in-process
+calibration, 5-point tslib-compatible `--calibrate`, hand-rolled canvas buttons,
+gesture recogniser — is built on `evdev` + Tk, not on the `unihiker` widgets,
+which cover taps only —
 `add_button(onclick=)` and `draw_*(onclick=)` are `<Button-1>` bindings on one
 item, and `on_mouse_move` gives you motion without contact state.
 

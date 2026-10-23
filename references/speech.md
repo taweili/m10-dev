@@ -120,9 +120,8 @@ def transcribe_wav(path):
 The **model loads once** (~300 MB, seconds) and recognizers are cheap — never
 re-load the model per clip. For a button-driven UI, record-then-decode beats
 streaming VAD: the press decision *is* the utterance boundary. The worked
-example — mic thread + `queue.Queue` UI hand-off, Vosk self-restart, `--file`
-headless test mode — is `examples/04_push_to_talk_stt.py`, described in the
-repo's `examples/README.md`.
+example — mic thread owning the `pyaudio` stream, `queue.Queue` UI hand-off,
+`--file` headless test mode — is `templates/push_to_talk.py`.
 
 ### Others
 
@@ -197,8 +196,9 @@ Playback is a separate choice, and it follows the speaker rather than the TTS:
 | USB speaker | `aplay -q -D hw:N,0 out.wav` | a real ALSA card; Pulse may be masked |
 | anything, Pulse up | `unihiker.Audio().play(...)` | Pulse client, so it follows the default sink |
 
-Worked example: `examples/08_hello_world_tts.py` (paplay when `pactl` answers,
-`aplay` otherwise, `--device` to force a card).
+Idiom: dispatch on `pactl` — `paplay out.wav` when Pulse answers,
+`aplay -q -D hw:N,0 out.wav` otherwise — and take a `--device` flag to force a
+card.
 
 **Flite** (English, native **16 kHz** output — matches the mic):
 

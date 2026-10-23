@@ -96,8 +96,8 @@ imports the DFRobot stack must still run under 3.7. `python3 -m venv` works and
 is worth it for third-party pins, but it does not change that.
 
 Pin dependencies in a `requirements.txt` and install with the offline
-procedure below when Wi-Fi is unavailable. Keep the repo's `examples/` flat:
-image files must sit next to the running `.py`.
+procedure below when Wi-Fi is unavailable. Keep scripts flat: image files must
+sit next to the running `.py`.
 
 **Disk:** `/root` is the eMMC (16 GB, shared with the OS); `/tmp` is **tmpfs**,
 so large models or recordings there consume the 512 MB of RAM.
@@ -229,7 +229,7 @@ skill script `scripts/m10-trim-services.py` handles that case.
 
 **Do NOT disable:** `Xorg`, `PulseAudio` (the `unihiker` **`Audio` API** needs it
 — but **only** that; a script that records/plays via `pyaudio`/`arecord` on the
-ALSA device directly, like `examples/03`, does **not** need pulse; a **Bluetooth
+ALSA device directly does **not** need pulse; a **Bluetooth
 A2DP speaker** also needs pulse — see `references/bluetooth.md`), `lightdm`,
 `NetworkManager`, `sshd`, `systemd-*`, `isc-dhcp-server` (the board's own DHCP
 for the USB link in `--dhcp` mode), `unclutter` (hides the cursor for touch).

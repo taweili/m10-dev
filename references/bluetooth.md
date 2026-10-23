@@ -115,8 +115,8 @@ pactl list short sinks | grep bluez        # bluez_sink.<MAC>.a2dp_sink back
 A speaker that idle-disconnects will do this after a period of silence; check
 the sink, not just `Connected:`, before blaming the player. Log the sink name
 from your app (`pactl info | grep 'Default Sink'`) so a silent run is
-diagnosable after the fact — `examples/08_hello_world_tts.py` prints
-`play paplay -> bluez_sink.…a2dp_sink` for exactly this reason.
+diagnosable after the fact — printing something like
+`play paplay -> bluez_sink.…a2dp_sink` makes a silent failure self-explanatory.
 
 ## 3. Auto-reconnect after reboot
 

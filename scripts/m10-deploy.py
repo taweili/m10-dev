@@ -2,7 +2,7 @@
 """Push files to the M10 and (re)start a GUI/daemon script there.
 
     ./m10-deploy.py app.py
-    ./m10-deploy.py examples/04_push_to_talk_stt.py --dest-dir /root/g-buddy
+    ./m10-deploy.py app.py --dest-dir /root/app
     ./m10-deploy.py app.py --run "python3 app.py --flag" --name app
     ./m10-deploy.py --stop --name app
     ./m10-deploy.py app.py --no-run --wait 0

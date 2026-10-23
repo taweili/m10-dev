@@ -38,7 +38,7 @@ scp    root@10.1.2.3:/etc/X11/xorg.conf.d/20-modesetting.conf ~/m10-backup/
 ```
 
 The Xorg conf is worth grabbing explicitly: losing landscape rotation is easy to
-forget about until two of your examples render clipped (`verify-gui.md`).
+forget about until two of your scripts render clipped (`verify-gui.md`).
 
 ## The burner kit
 

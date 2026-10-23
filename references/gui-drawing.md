@@ -271,7 +271,7 @@ while True:
 ```
 
 The Tk mainloop is a daemon thread; `sleep` just keeps the Python process alive.
-Simple, easy to reason about, used by every example.
+Simple, easy to reason about, and the default pick for a render loop.
 
 **Loop B — Tk-native `after()`:**
 
@@ -400,8 +400,7 @@ Give each direction its own queue (`jobs` to the worker, `events` back) and let
 the worker **own** its mutable data (a frame buffer, a list of samples) so
 nothing is shared. Keep the worker reading its input continuously even while it
 has no work — a mic or serial stream that pauses fills the driver buffer and the
-next read starts stale. The worked example is `examples/04_push_to_talk_stt.py`
-in the `g-buddy` repo (see its `examples/README.md`).
+next read starts stale. The worked example is `templates/push_to_talk.py`.
 
 ### 6.9 Text that fits
 

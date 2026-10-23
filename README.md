@@ -11,7 +11,7 @@ This repo is packaged as an agent skill: an `SKILL.md` entry point the agent
 reads on trigger, self-contained references it reads on demand, and the scripts
 and templates it needs to act.
 
-Current version: **0.8.0** (`CHANGELOG.md`).
+Current version: **0.8.1** (`CHANGELOG.md`).
 
 ## Layout
 
@@ -99,8 +99,7 @@ The board itself is stock DFRobot firmware (v0.4.2), Debian 10, and EOL — so
 
 ## Related
 
-The `g-buddy` repo (`AGENTS.md`, `examples/`) is the reference
-implementation: the six runnable demos and how to run them
-(`examples/README.md`), plus the instance facts for one particular board. The
-skill is self-contained — the repo is where a specific board's instance lives,
-not a second copy of this material.
+The `g-buddy` repo (`AGENTS.md`, `gbuddy.py`) is the board-specific instance:
+instance facts, board wiring, and the capstone program. The skill is
+self-contained — the repo is where a specific board's instance lives, not a
+second copy of this material.

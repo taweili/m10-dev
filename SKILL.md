@@ -198,7 +198,7 @@ Templates (copy, rename, deploy):
 ## Related material
 
 `SKILL.md` and `references/` are the canonical how-to. The `g-buddy` repo
-(`AGENTS.md`, `examples/README.md`, `scripts/`) is the reference implementation:
-runnable demos, the USB-link repair script, and host-specific deploy helpers.
-Read the skill first — the repo is where the board-specific instance lives, not
-a parallel copy of this material.
+(`AGENTS.md`, `gbuddy.py`, `scripts/`) is the board-specific instance: instance
+facts, board wiring, the capstone program, the USB-link repair script, and
+host-specific deploy helpers. Read the skill first — the repo is where the
+board-specific instance lives, not a parallel copy of this material.
