@@ -44,6 +44,7 @@ Read the reference that matches the task; each is self-contained.
 | Draw and animate: full GUI API, `config()` options, emoji sprites, easing | `references/gui-drawing.md` |
 | OS, packages, `apt`/EOL fix, firmware ladder, services, storage, time | `references/system.md` |
 | Speech in and out: STT/TTS options, models, pipelines | `references/speech.md` |
+| Official Python Starter Kit (KIT0194) + USB speaker/camera usage | `references/starter-kit.md` |
 | Azure Speech (real-time STT + neural TTS) | `references/azure-speech.md` |
 | Prove a GUI rendered, from `/dev/fb0` | `references/verify-gui.md` |
 | **X/app/audio wedged, board unresponsive, how to reboot** | `references/recovery.md` |

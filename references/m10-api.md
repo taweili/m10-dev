@@ -166,7 +166,8 @@ Verified acoustically: sounding the buzzer lifts capture from −50.7 to
 
 **There is no onboard speaker** — `audio.play()` needs a USB speaker in the
 USB-A port, **or a paired Bluetooth A2DP speaker** (`references/bluetooth.md`).
-The buzzer is separate and always works.
+The buzzer is separate and always works. The official kit's USB speaker module
+(and how to route to it) is covered in `starter-kit.md`.
 
 > **USB speaker not detected?** That is a hardware issue, not software —
 > see `recovery.md` §4 for the full ladder (lsusb → modprobe → PulseAudio →
