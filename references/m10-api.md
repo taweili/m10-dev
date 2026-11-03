@@ -198,19 +198,40 @@ uses PulseAudio, so a dead `pulseaudio` looks like a dead mic — restart it
 ```python
 import pyaudio
 p = pyaudio.PyAudio()
-# skip devices whose name contains "loopback" — card 0 is a non-routing loopback
+# The real mic is the RK3308 acodec: "rockchip,rk3308-acodec: - (hw:1,0)".
+# Matching the *name* "loopback" is NOT enough — "sysdefault" resolves to
+# card 0, and card 0 IS the Loopback (see gotchas).
+BAD = ("loopback", "sysdefault", "monitor", "lavrate", "samplerate",
+       "speexrate", "upmix", "vdownmix", "surround21")
 for i in range(p.get_device_count()):
     info = p.get_device_info_by_index(i)
-    if info["maxInputChannels"] > 0 and "loopback" not in info["name"].lower():
+    name = info["name"].lower()
+    if info["maxInputChannels"] > 0 and not any(b in name for b in BAD):
         break
 stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000,
                 input=True, input_device_index=i, frames_per_buffer=4000)
 ```
 
-Two gotchas: the ALSA **`Loopback`** card's playback does *not* reach its capture
-side (pure silence), so never rely on it to inject test audio; and
-`arecord -D hw:1,0` accepts **only 8 channels** (1/2 → `Channels count non
-available`) while pyaudio downmixes to mono fine.
+Gotchas, all measured on the bench (2026-10-30):
+
+- **`sysdefault` is the Loopback card, and it records digital silence.** Card 0
+  is a non-routing loopback, so a clip captured from it is a valid WAV of pure
+  zeros — ASR then invents words ("You.", "嗯。") instead of failing. Filter
+  `sysdefault`/`default`/`pulse` by name, don't just look for "loopback".
+  `peak == 0` over a whole clip is the tell.
+- **The acodec appears in pyaudio's list only while it is free.** With another
+  process holding it, device `(hw:1,0)` is missing and the first non-loopback
+  entry becomes `sysdefault` — which is precisely how you end up recording
+  silence. Check `fuser -v /dev/snd/pcmC1D0c` when in doubt.
+- **Only one process can own `pcmC1D0c`**, and opening it while held **blocks**
+  (ALSA waits; it does not return an error). `gbuddy.py` holds it whenever it
+  runs, so stop that service before running another mic app.
+- `arecord -D hw:1,0` accepts **only 8 channels** (1/2 → `Channels count non
+  available`); use `plughw:1,0` from the shell. pyaudio's `(hw:1,0)` entry is
+  already the plug layer, so 16 kHz mono works there.
+- The Loopback card's playback does *not* reach its capture side either, so it
+  cannot inject test audio. To test the mic path acoustically, `paplay` a WAV
+  out of the USB speaker and record it back through the acodec.
 
 **Testing without a mic:** add a `--file speech.wav` mode that streams a 16 kHz
 mono 16-bit WAV through the same code path. `espeak -w out.wav "…"` is installed
@@ -284,8 +305,16 @@ sysfs is **read-only** here.
 > the right** (`verify-gui.md`).
 
 **Screenshot orientation:** the framebuffer is still 240×320, so rotate the
-fetched image on the PC with `img.rotate(90, expand=True)` to match what the user
-sees.
+fetched image on the PC to match what the user sees: `rotate(90, expand=True)`
+for `Rotate "CW"`, `rotate(-90, expand=True)` for `Rotate "CCW"` (the two are
+180° apart — if the face comes out upside down, you picked the wrong one).
+
+**Rotating it 180° later** is just `"CW"` ↔ `"CCW"` in this file plus
+`systemctl restart lightdm`; the screen stays 320×240. Two knock-ons: a
+raw-evdev app that maps touch to panel coordinates must mirror both axes under
+`"CCW"` (only the gaze — the press is a contact edge and needs no calibration),
+and `/root/.xsessionrc` re-runs on every X login, so it restarts whichever
+buddy it names and that app grabs the mic again.
 
 ## 8. Speech (STT/TTS)
 
@@ -424,7 +453,8 @@ worth installing once Wi-Fi is up: `i2c-tools` (`i2cdetect -y 2`), `spi-tools`,
 4. `on_key_click(event, onclick)` — two positional args, and it's a USB keyboard.
 5. `buzzer.pitch` beat is an int count and blocks.
 6. No onboard speaker; there *is* an onboard mic.
-7. Skip `Loopback` capture devices.
+7. Skip `Loopback` **and `sysdefault`** capture devices — `sysdefault` *is* card
+   0's loopback and yields all-zero clips (`m10-api.md` §5).
 8. PIL can't decode RGB565 here.
 9. `config()` to update, not recreate (flicker); `remove()` is final.
 10. Image files live next to the running script.

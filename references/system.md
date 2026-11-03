@@ -74,18 +74,81 @@ snapshot. `apt` on this board is best treated as "restore the tools I need", not
 
 Python 3.7 reached EOL in **2023-10**, so many current wheels refuse to install
 (`Requires-Python >=3.8`: PyTorch ≥2.0, transformers ≥4.41, langchain, scipy
-≥1.12, numpy ≥2.0, …). Either pin older versions, or use pyenv — which only
-exists on **firmware ≥v0.4.1**:
+≥1.12, numpy ≥2.0, …). Either pin older versions, or use pyenv — which **ships
+preinstalled on firmware ≥v0.4.1**. On v0.4.0 there is no pyenv, no 3.8+, and
+no conda (DFRobot discourages conda/miniforge — too much disk on a 16 GB eMMC).
+
+### pyenv layout (verified on v0.4.2)
+
+- pyenv lives at **`/root/.pyenv`** — the v0.4.1+ recommended path, already
+  installed, *not* `/opt/pyenv` and no manual GitHub install needed.
+- `pyenv versions` lists three; `*` marks the active one:
+
+  | Version | Python | Kind |
+  |---|---|---|
+  | `system` | **3.7.3** | Debian 10's `/usr/bin/python3` — the default |
+  | `3.8.5` | 3.8.5 | pyenv |
+  | `3.12.7` | 3.12.7 | pyenv |
+
+- The shims are on root's `PATH` (`/root/.pyenv/shims`), so the bare
+  `python3`/`pip` resolve through pyenv. **The `pip` you type is the system
+  pip** (`/usr/local/lib/python3.7/dist-packages`) — install into a specific
+  version with that version's pip:
+  `/root/.pyenv/versions/<v>/bin/pip install ...`.
+
+### What each version ships (verified `pip list`)
+
+| Package | system 3.7.3 | 3.8.5 | 3.12.7 |
+|---|---|---|---|
+| `unihiker` (GUI) | 0.0.27 | 0.0.28.5 | 0.0.29.0 |
+| `pinpong` (GPIO) | 0.6.1 | 0.6.1 | 0.6.2 |
+| `pyaudio` (mic) | ✓ | 0.2.14 | 0.2.14 |
+| `evdev` (touch) | ✓ | 1.9.2 | 1.9.2 |
+| `requests` | ✓ | **missing** | 2.32.5 |
+| `sseclient` | ✓ | **missing** | **missing** |
+| `vosk` (STT) | ✓ | **missing** | **missing** |
+
+The pyenv versions ship the **board** stack (`unihiker`, `pinpong`, `evdev`,
+`pyaudio`) but not the voice/LLM ones — the wiki's "no module xxxx until you
+install them" is exactly this gap. The versions are newer than the as-shipped
+snapshot (`pinpong 0.6.2`, `unihiker 0.0.29.0` on 3.12.7). The GD32 coprocessor
+firmware is burned at first run and newer pinpong can want newer coprocessor
+firmware, but 0.6.2 works on this board with no reflash.
+
+### Switching
 
 ```bash
-pyenv versions
-pyenv global 3.12.7
+pyenv versions          # list, * = active
+pyenv global 3.12.7     # device-wide switch (or 3.8.5 / system)
+pyenv shell 3.12.7      # per-shell override
 ```
 
-On v0.4.0 there is no pyenv, no 3.8+, and no conda (DFRobot discourages
-conda/miniforge — too much disk on a 16 GB eMMC). Caveat: pyenv changes only the
-*python* on PATH; the DFRobot stack (`unihiker`, `pinpong`) lives in
-`/usr/local/lib/python3.7/`, so scripts that import them must run under 3.7.
+**Caveats**
+
+- The DFRobot stack is **not** 3.7-only: `unihiker`/`pinpong`/`evdev`/
+  `pyaudio` are installed in the pyenv versions too, so scripts that import
+  them **can** run under 3.8/3.12 (this corrects the older "must run under
+  3.7" claim).
+- A systemd unit with an absolute interpreter (`/usr/bin/python3`) will **not**
+  follow `pyenv global` — repoint `ExecStart` at the pyenv binary
+  (`/root/.pyenv/versions/<v>/bin/python`) to boot a newer version.
+- `pyenv global` is device-wide: any script run with the bare `python3` moves
+  with it; use `pyenv shell` for a one-off.
+
+### Filling the gaps for a voice/LLM script
+
+- `vosk` — the PyPI wheel is `py3-none-manylinux2014_aarch64.whl`
+  (Python/ABI-independent), so **one wheel serves 3.7/3.8/3.12**; the docs'
+  "3.5-3.9" line is conservative. The Debian 11 `libstdc++` preload still
+  applies — that is an OS ABI issue, not a Python one.
+- `sseclient` — the package is **`sseclient-py`** (import name `sseclient`),
+  pure Python, `requires-python >=3.7`.
+- `requests` — already on 3.12.7; also missing on 3.8.5.
+
+```bash
+/root/.pyenv/versions/3.12.7/bin/pip install vosk sseclient-py
+/root/.pyenv/versions/3.8.5/bin/pip install vosk sseclient-py requests
+```
 
 **`python3` is a pyenv shim on v0.4.1+.** `which -a python3` shows
 `/root/.pyenv/shims/python3` *before* `/usr/bin/python3`; on v0.4.2 as shipped
