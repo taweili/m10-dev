@@ -223,6 +223,7 @@ flite -t "Hello" -r 16000 -w /tmp/hi.wav
 | **Azure Speech** ⭐ | ✅ real-time | ✅ neural | 5 h STT + 500 K chars / mo | ✅ |
 | OpenAI | ✅ file | ✅ | none | ✅ |
 | Google Cloud | ✅ streaming | ✅ separate API | 60 min STT / mo | ✅ |
+| **QianwenAI** | ✅ file | ✅ | — | ✅ (REST) |
 | ElevenLabs | ❌ | ✅ best | 10 K credits | ❌ (REST only) |
 
 Azure is the recommended cloud option — full guide in `azure-speech.md`.
@@ -240,6 +241,20 @@ r = openai.audio.speech.create(model="tts-1", voice="alloy", input=text)
 r.stream_to_file("/tmp/out.mp3")
 from unihiker import Audio; Audio().play("/tmp/out.mp3")
 ```
+
+**QianwenAI — cheapest cloud, OpenAI-compatible** (Alibaba's Qwen platform,
+mainland-China; needs Wi-Fi):
+
+- Models: `qwen3-asr-flash` (STT, ¥0.00022/s) and `qwen3-tts-flash`
+  (TTS, ¥0.8 per 10k chars, 17 system voices). Plain HTTPS — no SDK.
+- OpenAI-compatible endpoint
+  `https://maas.qianwenaiapi.com/compatible-mode/v1` (ASR rides it; TTS uses
+  the DashScope HTTP route). Record-then-upload for STT, one call returning
+  audio for TTS — a `requests`/`urllib` POST is enough.
+- Voices are Chinese-first; English works but verify the chosen voice. Cloud
+  path: audio leaves the board.
+- Worked implementation: `gbuddy-qwen.py` and `examples/08` in the `g-buddy`
+  repo.
 
 ## Recommended pipelines
 
