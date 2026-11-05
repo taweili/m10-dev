@@ -16,6 +16,110 @@ Cloud integration: `azure-speech.md`.
 | **No Wi-Fi by default** | Cloud = Wi-Fi first (`wifi.md`); pip needs Wi-Fi too |
 | Passive buzzer | Beeps only, cannot play voice |
 
+## Capturing the mic (two working paths)
+
+* **ALSA via pyaudio** — `hw:1,0` (the RK3308 acodec, `pcmC1D0c`). Only one
+  process may own it; opening it while held blocks instead of failing, so check
+  `fuser -v /dev/snd/pcmC1D0c` first. `03`/`06`/`gbuddy.py` use this.
+* **PulseAudio via `pacat`** — needed by WebRTC/WebSocket clients
+  (`09`, `gbuddy-geodis.py`, `gbuddy-qwen.py`), where Pulse owns the acodec
+  and resamples:
+
+  ```bash
+  pacat -r --raw --rate=24000 --channels=1 --format=s16le \
+        --device=alsa_input.platform-acodec-sound.stereo-fallback - > out.pcm
+  ```
+
+  **`parecord --raw` returns 0 bytes on this board** (measured 2026-11-04;
+  a 44-byte WAV header and nothing else), and `-d default` does too — so name
+  the source explicitly. Pick it from `pactl list short sources`, skipping
+  `.monitor` entries (they carry the *sink's* audio, i.e. near-silence). Pulse
+  reports the source as `SUSPENDED` while idle and resumes on the first read;
+  a *zero-byte* capture usually means another process (the boot-on g-buddy
+  unit) owns the acodec — stop it first.
+
+### Mic gain — critical (RK3308 acodec quirk)
+
+**The onboard electret mic is nearly silent at default ALSA settings.**
+`ADC MIC Group 0 Left Volume` (ALSA numid=1 on card 1) defaults to value 0
+(0 dB preamp gain). It must be set to 3 (20 dB) for usable levels:
+
+```bash
+amixer -c 1 cset numid=1 3
+```
+
+This does **not** persist across reboots. Apply in `/root/.xsessionrc` or in
+`systemd` unit's `ExecStartPre`. The `ADC ALC Group 0 Left` (numid=21) is at
+31 (28.5 dB) by default and does not need adjustment.
+
+### Stereo capture pitfall — PulseAudio downmix cuts volume in half
+
+The acodec's Pulse source is **stereo** (`s16le 2ch 48000Hz`) but the onboard
+mic is only on the **left channel** — the right channel carries dead silence.
+When requesting `--channels=1` from Pulse, it averages both channels to mono,
+which halves the left channel's volume (6 dB loss).
+
+**Fix:** capture stereo (`--channels=2`) and extract the left channel in
+software:
+
+```python
+import subprocess
+proc = subprocess.Popen(["pacat", "-r", "--raw", "--rate=%d" % rate,
+                         "--channels=2", "--format=s16le",
+                         "--device", source],
+                        stdout=subprocess.PIPE)
+def read_mono(size):
+    """Read `size` bytes of mono PCM (left channel only)."""
+    raw = proc.stdout.read(size * 2)
+    left = bytearray(len(raw) // 2)
+    for i in range(len(raw) // 4):
+        left[i*2] = raw[i*4]
+        left[i*2+1] = raw[i*4+1]
+    return bytes(left)
+```
+
+Additionally, Pulse's software volume can boost the source above 100%:
+```bash
+pactl set-source-volume \
+    alsa_input.platform-acodec-sound.stereo-fallback 150%
+```
+
+Combined: max ALSA preamp (20 dB) + max Pulse volume (150% = +10.57 dB) +
+stereo→left extraction yields usable capture levels (peak ~15000 at 16-bit).
+
+### Unbuffered-pipe trap — `read(n)` does not return `n` bytes
+
+`pacat` is usually started with `bufsize=0`, which makes `proc.stdout` an
+**unbuffered `io.FileIO`**. `FileIO.read(n)` is a *single* `read(2)` syscall
+that returns however many bytes happen to be in the pipe — it does **not**
+block until `n` arrive. Measured on the M10: asking for 6400 bytes returned
+728-byte fragments, ~63 times per second instead of 10.
+
+This is invisible for a stream consumer that just concatenates bytes (an RTP
+track, a WAV writer) but **silently breaks any protocol with a fixed frame
+size** — e.g. the Qwen realtime WS API wants 3200-byte / 100 ms
+`input_audio_buffer.append` frames, and ragged fragments make the server
+transcribe nothing while the mic is demonstrably loud.
+
+Always accumulate:
+
+```python
+def _read_exact(self, n):
+    parts, got = [], 0
+    while got < n:
+        chunk = self.proc.stdout.read(n - got)   # may be short
+        if not chunk:
+            break                                 # child died / EOF
+        parts.append(chunk)
+        got += len(chunk)
+    return b"".join(parts)
+```
+
+Symptoms if you forget it: chunk sizes vary run to run, chunk rate is far
+above `bytes_expected / frame_size`, and downstream code that assumes a fixed
+frame gets garbage or nothing at all. Check with a one-liner that records
+`sorted(set(len(chunk) for chunk in chunks))` — it should be a single value.
+
 ## Decision table
 
 **STT**
@@ -223,7 +327,7 @@ flite -t "Hello" -r 16000 -w /tmp/hi.wav
 | **Azure Speech** ⭐ | ✅ real-time | ✅ neural | 5 h STT + 500 K chars / mo | ✅ |
 | OpenAI | ✅ file | ✅ | none | ✅ |
 | Google Cloud | ✅ streaming | ✅ separate API | 60 min STT / mo | ✅ |
-| **QianwenAI** | ✅ file | ✅ | — | ✅ (REST) |
+| **QianwenAI (Realtime WebSocket)** | ✅ real-time S2S | ✅ (17 voices) | — | ✅ (REST) |
 | ElevenLabs | ❌ | ✅ best | 10 K credits | ❌ (REST only) |
 
 Azure is the recommended cloud option — full guide in `azure-speech.md`.
@@ -242,19 +346,39 @@ r.stream_to_file("/tmp/out.mp3")
 from unihiker import Audio; Audio().play("/tmp/out.mp3")
 ```
 
-**QianwenAI — cheapest cloud, OpenAI-compatible** (Alibaba's Qwen platform,
-mainland-China; needs Wi-Fi):
+**QianwenAI Realtime WebSocket — speech-to-speech, one model does all**
+(Alibaba's Qwen platform, mainland-China; needs Wi-Fi):
 
-- Models: `qwen3-asr-flash` (STT, ¥0.00022/s) and `qwen3-tts-flash`
-  (TTS, ¥0.8 per 10k chars, 17 system voices). Plain HTTPS — no SDK.
-- OpenAI-compatible endpoint
-  `https://maas.qianwenaiapi.com/compatible-mode/v1` (ASR rides it; TTS uses
-  the DashScope HTTP route). Record-then-upload for STT, one call returning
-  audio for TTS — a `requests`/`urllib` POST is enough.
-- Voices are Chinese-first; English works but verify the chosen voice. Cloud
-  path: audio leaves the board.
-- Worked implementation: `gbuddy-qwen.py` and `examples/08` in the `g-buddy`
-  repo.
+A single `qwen-audio-3.1-realtime-flash` model is the ear, the brain and the
+mouth — no separate STT + TTS services. Audio is sent as base64 PCM over a
+WebSocket; the model transcribes, thinks, and synthesises the answer in one
+round trip.
+
+- Endpoint (WebSocket):
+  `wss://maas.qianwenaiapi.com/api-ws/v1/realtime?model=qwen-audio-3.1-realtime-flash`
+- Auth: `Authorization: Bearer $DASHSCOPE_API_KEY` in the WebSocket handshake
+- Audio in: `input_audio_buffer.append` with base64 PCM (16 kHz, 16-bit, mono)
+- Audio out: `response.audio.delta` with base64 PCM (24 kHz, 16-bit, mono)
+- Protocol: push-to-talk (`turn_detection: null`), then `commit` + `response.create`
+- Voices: `longanqian_v3.1` (default), `longanhuan_v3.1`, `longanlingxin_v3.1`,
+  `longanfengyue_v3.1`, `xunanchuan_v3.1` — Chinese-first; set
+  `session.output_audio.language: "en"` for English output
+- Cautions:
+  - **WebRTC** (SDP/RTP) mode does NOT work with aiortc 1.15.0 on this board —
+    the RTP send loop never starts (`recv()` is never called). Use **WebSocket**
+    instead.
+  - The input audio buffer for push-to-talk is **not** filled from the RTP
+    stream in WebRTC mode; you must send `input_audio_buffer.append` over the
+    DataChannel. This works correctly with WebSocket.
+  - The mic preamp gain fix (see above) is essential — the default 0 dB preamp
+    leaves audio too quiet for ASR.
+- Cost: ¥0.00022/s input + ¥0.8 per 10k chars output* (voice model-specific)
+- Implementation: `gbuddy-qwen.py` in the `g-buddy` bench repo uses this.
+  No aiortc dependency; only `websockets` (installable via pip).
+
+**Old HTTP path (qwen3-asr-flash + qwen3-tts-flash)** — still available through
+`examples/08_qianwen_tts_stt.py`. Uses separate REST calls for ASR and TTS
+(OpenAI-compatible endpoint + DashScope HTTP).
 
 ## Recommended pipelines
 
@@ -264,7 +388,8 @@ mainland-China; needs Wi-Fi):
 | **Best quality** (Wi-Fi) | mic → Azure STT → GPT → Azure TTS → USB speaker (~3–8 s round trip) |
 | **Simplest** | mic → OpenAI Whisper → logic → pyttsx3 → USB speaker |
 | **Single dependency** | sherpa-onnx for both STT and TTS (Py 3.7 ✅, ~120 MB) |
-| **Fully offline assistant** | Whisper.cpp tiny → SmolLM2-360M → Flite (~267 MB peak, ~40 s — not interactive) |
+| **Best cloud (qianwen S2S)** (Wi-Fi) | mic → qwen-audio-3.1-realtime-flash WebSocket → USB speaker (~2–6 s round trip) |
+| **Lightest cloud (qianwen HTTP)** (Wi-Fi) | mic → qwen3-asr-flash → logic → qwen3-tts-flash → USB speaker |
 
 ## Models: download on PC, deploy by SFTP
 

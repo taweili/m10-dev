@@ -123,19 +123,25 @@ These need an explicit **yes** from the user; they destroy state, change the
    `archive.debian.org` before installing anything → `references/system.md`.
 8. **No onboard speaker, but there *is* an onboard mic.** Skip ALSA devices
    named `Loopback` → `references/m10-api.md`.
-9. **PIL 9.0.1 here cannot decode RGB565.** Decode `/dev/fb0` by hand →
+9. **Mic capture is silent at factory gain.** The preamp ships at 0 dB; set
+   `amixer -c 1 cset numid=1 3` (20 dB) or every clip peaks ~96 and ASR hears
+   nothing. It does not survive a reboot → `references/speech.md`. Related:
+   capture the acodec **stereo and take the left** (a mono downmix halves it),
+   and accumulate short reads — an unbuffered child pipe's `read(n)` does not
+   return `n` bytes, which breaks any fixed-frame protocol.
+10. **PIL 9.0.1 here cannot decode RGB565.** Decode `/dev/fb0` by hand →
    `references/verify-gui.md`.
-10. **Vosk (and only Vosk) needs the Debian 11 `libstdc++` preload** →
+11. **Vosk (and only Vosk) needs the Debian 11 `libstdc++` preload** →
    `references/speech.md`.
-11. **A flash is a reimage, not an upgrade.** It wipes `/root/`, the Wi-Fi
+12. **A flash is a reimage, not an upgrade.** It wipes `/root/`, the Wi-Fi
     profiles, and the landscape `Rotate` config (the board returns portrait
     240×320), so back up — and re-apply landscape — every time →
     `references/flash-firmware.md`.
-12. **Touch arrives as raw, uncalibrated 12-bit ADC.** There is no
+13. **Touch arrives as raw, uncalibrated 12-bit ADC.** There is no
     `/etc/pointercal` on the image, so the X/tslib path is dead until you fit
     one; evdev + your own affine works out of the box →
     `references/m10-api.md` §9.
-13. **The panel has one owner.** The home menu (`PyboardUI`) and your app both
+14. **The panel has one owner.** The home menu (`PyboardUI`) and your app both
     draw to the framebuffer, so autostart *replaces* the
     `systemctl --user start PyboardUI` line in `/root/.xsessionrc` — never
     `rc.local` or a system unit, which get none of the session
@@ -155,6 +161,7 @@ These need an explicit **yes** from the user; they destroy state, change the
 - **A reboot ends a deploy.** Nothing restarts a hand-launched app; if the
   bench must survive power cycles, supervise it as a user unit →
   `references/autostart.md`.
+
 
 ## Quick start
 

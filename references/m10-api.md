@@ -25,6 +25,11 @@ Linux IO (not Firmata).
 Portrait is **240×320**; origin top-left, +x right, +y down, centre ≈ (120,160).
 Landscape (320×240, centre (160,120)) needs the Xorg rotation in §7.
 
+> **Order matters:** create the `GUI()` **before** `Board().begin()`. A GUI
+> created after `begin()` never maps its window on this image (pinpong +
+> pyenv 3.12.7): the app runs, draws into nothing, and the panel keeps X's grey
+> root — measured 2026-11-04. See §11.
+
 ```python
 gui = GUI()                    # or GUI(w=320, h=240) in landscape
 ```
@@ -164,6 +169,25 @@ MIC **group 0 = `Work`** (groups 1–3 are `Mute` and read stuck at ±32768).
 Verified acoustically: sounding the buzzer lifts capture from −50.7 to
 −28.0 dBFS.
 
+> **Critical gain fix.** The preamp `ADC MIC Group 0 Left Volume` (ALSA
+> numid=1, values 0–3) defaults to **0 (0 dB)**. Set to **3 (20 dB)** for
+> usable levels:
+>
+> ```bash
+> amixer -c 1 cset numid=1 3
+> ```
+>
+> This does not persist across reboots. Apply in `/root/.xsessionrc`:
+> ```
+> amixer -c 1 cset numid=1 3 >/dev/null 2>&1
+> ```
+>
+> **PulseAudio capture tip.** The acodec's Pulse source is **stereo**
+> (`s16le 2ch 48000Hz`). When requesting `--channels=1`, Pulse averages both
+> channels to mono — but only the left channel carries the mic; the right is
+> dead silence, which cuts the left's volume in half. Use `--channels=2` and
+> extract the left channel in code (see `speech.md` for the snippet).
+
 **There is no onboard speaker** — `audio.play()` needs a USB speaker in the
 USB-A port, **or a paired Bluetooth A2DP speaker** (`references/bluetooth.md`).
 The buzzer is separate and always works. The official kit's USB speaker module
@@ -232,6 +256,15 @@ Gotchas, all measured on the bench (2026-10-30):
 - The Loopback card's playback does *not* reach its capture side either, so it
   cannot inject test audio. To test the mic path acoustically, `paplay` a WAV
   out of the USB speaker and record it back through the acodec.
+- **A quiet capture is usually the preamp, not the app.** Check in this order:
+  `amixer -c 1 cget numid=1` must be **3** (20 dB — the factory default is 0),
+  the Pulse source must be unmuted, and the capture must be **stereo with the
+  left channel taken** (mono downmix averages in a dead right channel). See
+  `speech.md` for the commands and level numbers.
+- **`read(n)` on an unbuffered child pipe returns short reads.** With
+  `bufsize=0`, `proc.stdout.read(6400)` can return 728 bytes — fine for a
+  stream, fatal for a fixed-frame protocol. Accumulate until the chunk is
+  whole; `speech.md` has the helper and the symptoms.
 
 **Testing without a mic:** add a `--file speech.wav` mode that streams a 16 kHz
 mono 16-bit WAV through the same code path. `espeak -w out.wav "…"` is installed
@@ -446,7 +479,11 @@ worth installing once Wi-Fi is up: `i2c-tools` (`i2cdetect -y 2`), `spi-tools`,
 
 ## 11. Gotcha summary
 
-1. `Board().begin()` first, always.
+1. **`GUI()` first, then `Board().begin()`.** Hardware calls still need
+   `begin()`, but a GUI created *after* it never maps its window here (the app
+   runs normally, the panel stays on X's grey root; measured 2026-11-04). Also:
+   killing GUI apps with `kill -9` can wedge Xorg (windows exist but nothing
+   repaints, `xsetroot` has no effect) — fix with `systemctl restart lightdm`.
 2. End with `while True: time.sleep(...)`; SIGINT is a clean exit.
 3. `fill_rect` has no radius → use `fill_round_rect` (or `fill_circle`, whose
    x,y is the centre).
